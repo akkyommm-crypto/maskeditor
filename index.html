@@ -102,6 +102,20 @@ input[type=file]{display:none}
       </div>
     </div>
     <div class="bar">
+      <button class="btn" id="aiBlack">AI：被写体を黒</button>
+      <button class="btn" id="aiWhite">AI：被写体を白</button>
+      <select id="aiModel" class="btn" style="padding:8px 6px">
+        <option value="rmbg">高精度</option>
+        <option value="modnet">人物特化</option>
+      </select>
+    </div>
+    <div class="bar">
+      <label class="sl">感度<input type="range" id="aiTh" min="5" max="95" value="50"><b id="aiThv">50</b></label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim)">
+        <input type="checkbox" id="aiBg" checked>背景も逆色で塗る</label>
+      <span id="aiMsg" style="font-size:11px;color:var(--amber)"></span>
+    </div>
+    <div class="bar">
       <button class="btn ghost" id="undo" disabled>戻す</button>
       <button class="btn ghost" id="redo" disabled>やり直し</button>
       <button class="btn ghost" id="fit">全体</button>
@@ -251,6 +265,62 @@ function unpack(b){
     d[i*4]=d[i*4+1]=d[i*4+2]=v;d[i*4+3]=255;}
   mctx.putImageData(im,0,0);maskDirty=true;
 }
+/* ===== AIで被写体を判定する（端末内で処理・無料） ===== */
+let aiLib=null,aiModel=null,aiProc=null,aiName='';
+const AI_MODELS={rmbg:'briaai/RMBG-1.4', modnet:'Xenova/modnet'};
+function aiStatus(t){$('#aiMsg').textContent=t||'';}
+async function aiLoad(key){
+  if(!aiLib){
+    aiStatus('ライブラリ取得中…');
+    aiLib=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3');
+    aiLib.env.allowLocalModels=false;
+  }
+  if(aiModel&&aiName===key)return;
+  aiStatus('モデル取得中…（初回のみ）');
+  const id=AI_MODELS[key];
+  aiModel=await aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'},device:'webgpu',dtype:'fp32'})
+    .catch(function(){return aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'}});});
+  aiProc=await aiLib.AutoProcessor.from_pretrained(id,{config:{
+    do_normalize:true,do_pad:false,do_rescale:true,do_resize:true,
+    image_mean:[0.5,0.5,0.5],image_std:[1,1,1],
+    feature_extractor_type:'ImageFeatureExtractor',resample:2,
+    rescale_factor:0.00392156862745098,size:{width:1024,height:1024}}});
+  aiName=key;
+}
+/* 被写体の確率マップ（0-255）を元画像サイズで返す */
+async function aiAlpha(){
+  await aiLoad($('#aiModel').value);
+  aiStatus('解析中…');
+  const raw=await aiLib.RawImage.fromURL(srcCv.toDataURL('image/png'));
+  const {pixel_values}=await aiProc(raw);
+  const out=await aiModel({input:pixel_values});
+  const t=out.output||out.alphas||Object.values(out)[0];
+  const m=await aiLib.RawImage.fromTensor(t[0].mul(255).to('uint8')).resize(W,H);
+  aiStatus('');
+  return m.data;
+}
+/* 被写体を塗る（黒＝透かさない／白＝透かす） */
+async function aiFill(target){
+  if(!srcCv){alert('先に原版を読み込んでください');return;}
+  try{
+    const a=await aiAlpha();
+    snap();
+    const im=mctx.getImageData(0,0,W,H),d=im.data;
+    const th=+$('#aiTh').value*2.55;
+    for(let i=0;i<W*H;i++){
+      if(a[i]>=th){                      // 被写体
+        const v=(target==='subjBlack')?0:255;
+        d[i*4]=d[i*4+1]=d[i*4+2]=v;
+      }else if($('#aiBg').checked){       // 背景も塗る
+        const v=(target==='subjBlack')?255:0;
+        d[i*4]=d[i*4+1]=d[i*4+2]=v;
+      }
+      d[i*4+3]=255;
+    }
+    mctx.putImageData(im,0,0);maskDirty=true;draw();
+  }catch(e){aiStatus('失敗しました');console.error(e);
+    alert('解析に失敗しました。通信環境を確認してもう一度お試しください。');}
+}
 function snap(){
   if(!mask)return;
   undoS.push(pack());if(undoS.length>50)undoS.shift();
@@ -389,6 +459,9 @@ document.querySelectorAll('[data-tool]').forEach(function(b){b.onclick=function(
   $('#szwrap').hidden=!(tool==='brush'||tool==='line');$('#tlwrap').hidden=(tool!=='wand');draw();};});
 $('#size').oninput=function(e){brush=+e.target.value;$('#szv').textContent=brush;};
 $('#tol').oninput=function(e){tol=+e.target.value;$('#tlv').textContent=tol;};
+$('#aiBlack').onclick=function(){aiFill('subjBlack');};
+$('#aiWhite').onclick=function(){aiFill('subjWhite');};
+$('#aiTh').oninput=function(e){$('#aiThv').textContent=e.target.value;};
 $('#fit').onclick=fit;
 $('#disp').onclick=function(){disp=(disp+1)%3;$('#disp').textContent=['重ね','マスク','ホイル'][disp];draw();};
 
