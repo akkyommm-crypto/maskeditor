@@ -53,6 +53,7 @@ input[type=range]{flex:1;accent-color:var(--amber);min-width:60px}
 label.sl b{color:var(--text);font-variant-numeric:tabular-nums;width:26px;text-align:right}
 #hint{font-size:11px;color:var(--dim);margin-top:7px;line-height:1.5}
 input[type=file]{display:none}
+[hidden]{display:none!important}
 
 #sheet{position:fixed;inset:0;background:rgba(10,8,6,.86);display:none;
   align-items:center;justify-content:center;padding:18px;z-index:20}
@@ -109,7 +110,7 @@ input[type=file]{display:none}
         <option value="modnet">人物特化</option>
       </select>
     </div>
-    <div class="bar" id="alphaRow" hidden>
+    <div class="bar" id="alphaRow">
       <button class="btn" id="alBlack">透明度から：被写体を黒</button>
       <button class="btn" id="alWhite">白</button>
       <span style="font-size:11px;color:var(--dim)">切り抜き済み画像はこちらが正確</span>
@@ -332,6 +333,7 @@ async function aiFill(target){
 /* 元画像の透明度からマスクを作る（切り抜き済み画像はこれが一番正確） */
 function alphaFill(target){
   if(!srcAlpha){alert('先に原版を読み込んでください');return;}
+  if(!hasAlpha){alert('この画像には透明部分がありません。\nAIボタンを使うか、切り抜き済みのPNGを読み込んでください。');return;}
   snap();
   const im=mctx.getImageData(0,0,W,H),d=im.data;
   const th=+$('#aiTh').value*2.55;
@@ -513,7 +515,6 @@ $('#fSrc').onchange=function(e){
     flatCv=document.createElement('canvas');flatCv.width=W;flatCv.height=H;
     const fc=flatCv.getContext('2d');
     fc.fillStyle='#fff';fc.fillRect(0,0,W,H);fc.drawImage(im,0,0);
-    $('#alphaRow').hidden=!hasAlpha;
     mask=document.createElement('canvas');mask.width=W;mask.height=H;
     mctx=mask.getContext('2d',{willReadFrequently:true});
     mctx.fillStyle='#000';mctx.fillRect(0,0,W,H);
