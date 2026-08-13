@@ -109,6 +109,11 @@ input[type=file]{display:none}
         <option value="modnet">人物特化</option>
       </select>
     </div>
+    <div class="bar" id="alphaRow" hidden>
+      <button class="btn" id="alBlack">透明度から：被写体を黒</button>
+      <button class="btn" id="alWhite">白</button>
+      <span style="font-size:11px;color:var(--dim)">切り抜き済み画像はこちらが正確</span>
+    </div>
     <div class="bar">
       <label class="sl">感度<input type="range" id="aiTh" min="5" max="95" value="50"><b id="aiThv">50</b></label>
       <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim)">
@@ -148,6 +153,7 @@ const $=s=>document.querySelector(s);
 const view=$('#view'),vctx=view.getContext('2d'),stage=$('#stage'),dot=$('#dot'),hud=$('#hud');
 
 let srcCv=null,sdata=null,mask=null,mctx=null,W=0,H=0;
+let srcAlpha=null,flatCv=null,hasAlpha=false;
 let scale=1,ox=0,oy=0;
 let ink='w',tool='brush',brush=46,tol=30,disp=0;
 const undoS=[],redoS=[];
@@ -293,7 +299,7 @@ async function aiLoad(key){
 async function aiAlpha(){
   await aiLoad($('#aiModel').value);
   aiStatus('解析中…');
-  const raw=await aiLib.RawImage.fromURL(srcCv.toDataURL('image/png'));
+  const raw=await aiLib.RawImage.fromURL((flatCv||srcCv).toDataURL('image/png'));
   const {pixel_values}=await aiProc(raw);
   const out=await aiModel({input:pixel_values});
   const t=out.output||out.alphas||Object.values(out)[0];
@@ -322,6 +328,24 @@ async function aiFill(target){
     mctx.putImageData(im,0,0);maskDirty=true;draw();
   }catch(e){aiStatus('失敗しました');console.error(e);
     alert('解析に失敗しました。通信環境を確認してもう一度お試しください。');}
+}
+/* 元画像の透明度からマスクを作る（切り抜き済み画像はこれが一番正確） */
+function alphaFill(target){
+  if(!srcAlpha){alert('先に原版を読み込んでください');return;}
+  snap();
+  const im=mctx.getImageData(0,0,W,H),d=im.data;
+  const th=+$('#aiTh').value*2.55;
+  for(let i=0;i<W*H;i++){
+    if(srcAlpha[i]>=th){
+      const v=(target==='subjBlack')?0:255;
+      d[i*4]=d[i*4+1]=d[i*4+2]=v;
+    }else if($('#aiBg').checked){
+      const v=(target==='subjBlack')?255:0;
+      d[i*4]=d[i*4+1]=d[i*4+2]=v;
+    }
+    d[i*4+3]=255;
+  }
+  mctx.putImageData(im,0,0);maskDirty=true;draw();
 }
 function snap(){
   if(!mask)return;
@@ -461,6 +485,8 @@ document.querySelectorAll('[data-tool]').forEach(function(b){b.onclick=function(
   $('#szwrap').hidden=!(tool==='brush'||tool==='line');$('#tlwrap').hidden=(tool!=='wand');draw();};});
 $('#size').oninput=function(e){brush=+e.target.value;$('#szv').textContent=brush;};
 $('#tol').oninput=function(e){tol=+e.target.value;$('#tlv').textContent=tol;};
+$('#alBlack').onclick=function(){alphaFill('subjBlack');};
+$('#alWhite').onclick=function(){alphaFill('subjWhite');};
 $('#aiBlack').onclick=function(){aiFill('subjBlack');};
 $('#aiWhite').onclick=function(){aiFill('subjWhite');};
 $('#aiTh').oninput=function(e){$('#aiThv').textContent=e.target.value;};
@@ -479,6 +505,15 @@ $('#fSrc').onchange=function(e){
     srcCv=document.createElement('canvas');srcCv.width=W;srcCv.height=H;
     const sc=srcCv.getContext('2d',{willReadFrequently:true});sc.drawImage(im,0,0);
     sdata=sc.getImageData(0,0,W,H).data;
+    // 透明度を持つ画像かどうかを調べ、アルファを取っておく
+    srcAlpha=new Uint8Array(W*H);let tr=0;
+    for(let i=0;i<W*H;i++){srcAlpha[i]=sdata[i*4+3];if(sdata[i*4+3]<250)tr++;}
+    hasAlpha=(tr>W*H*0.02);
+    // AIに渡す用：白背景に合成した版
+    flatCv=document.createElement('canvas');flatCv.width=W;flatCv.height=H;
+    const fc=flatCv.getContext('2d');
+    fc.fillStyle='#fff';fc.fillRect(0,0,W,H);fc.drawImage(im,0,0);
+    $('#alphaRow').hidden=!hasAlpha;
     mask=document.createElement('canvas');mask.width=W;mask.height=H;
     mctx=mask.getContext('2d',{willReadFrequently:true});
     mctx.fillStyle='#000';mctx.fillRect(0,0,W,H);
