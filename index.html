@@ -66,6 +66,25 @@ input[type=file]{display:none}
 #sheet .note{font-size:11px;color:var(--dim);margin:10px 0 14px;line-height:1.6}
 #sheet .acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 #sheet a.btn{text-decoration:none;display:inline-block}
+
+/* ===== AIマスク改善UI ===== */
+.aiBox{border:1px solid var(--line);border-radius:10px;padding:8px;background:#1C1813}
+.aiBox summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:var(--amber);font-size:11px;font-weight:800;letter-spacing:.08em;list-style:none}
+.aiBox summary::-webkit-details-marker{display:none}
+.aiBox[open] summary{margin-bottom:8px}
+.aiBox .bar{margin-top:0}.aiBox .bar+.bar{margin-top:7px}
+.aiHead{display:flex;align-items:center;gap:7px}
+.aiHead .btn{flex:1}.aiHead select{max-width:128px}
+.aiGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.aiGrid .btn{padding:9px 5px}
+.aiOpts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--dim)}
+.aiOpts label{display:flex;gap:5px;align-items:center}
+#aiApply{background:var(--amber);color:#171108;border-color:var(--amber);font-weight:800}
+#aiApply:disabled,#aiCancel:disabled{opacity:.35}
+#aiMsg{min-width:42px;text-align:right}
+.badge{font-size:10px;border:1px solid var(--line);border-radius:999px;padding:3px 7px;color:var(--dim);white-space:nowrap}
+.badge.ok{color:var(--amber);border-color:#6F5127}
+.zoomBtns{display:flex;gap:4px}.zoomBtns .btn{padding:7px 10px}
 </style>
 </head>
 <body>
@@ -102,34 +121,47 @@ input[type=file]{display:none}
         <button class="btn" data-tool="pan">移動</button>
       </div>
     </div>
-    <div class="bar">
-      <button class="btn" id="aiBlack">AI：被写体を黒</button>
-      <button class="btn" id="aiWhite">AI：被写体を白</button>
-      <select id="aiModel" class="btn" style="padding:8px 6px">
-        <option value="rmbg">高精度</option>
-        <option value="modnet">人物特化</option>
-      </select>
-    </div>
-    <div class="bar" id="alphaRow">
-      <button class="btn" id="alBlack">透明度から：被写体を黒</button>
-      <button class="btn" id="alWhite">白</button>
-      <span style="font-size:11px;color:var(--dim)">切り抜き済み画像はこちらが正確</span>
-    </div>
-    <div class="bar">
-      <label class="sl">感度<input type="range" id="aiTh" min="5" max="95" value="50"><b id="aiThv">50</b></label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim)">
-        <input type="checkbox" id="aiBg" checked>背景も逆色で塗る</label>
-      <span id="aiMsg" style="font-size:11px;color:var(--amber)"></span>
-    </div>
+    <details class="aiBox" id="aiDetails" open>
+      <summary><span>AI自動マスク</span><span style="font-size:10px;color:var(--dim);font-weight:400">タップで開閉</span></summary>
+      <div class="aiHead">
+        <button class="btn" id="aiAnalyze">① AI解析</button>
+        <select id="aiModel" class="btn" style="padding:8px 6px">
+          <option value="rmbg">高精度・一般</option>
+          <option value="modnet">人物特化</option>
+        </select>
+        <span id="aiState" class="badge">未解析</span>
+      </div>
+      <div class="bar">
+        <label class="sl">感度<input type="range" id="aiTh" min="5" max="95" value="50"><b id="aiThv">50</b></label>
+        <label class="sl">境界<input type="range" id="aiEdge" min="-6" max="6" value="0"><b id="aiEdgev">0</b></label>
+      </div>
+      <div class="aiGrid">
+        <button class="btn" id="aiBlack">② 被写体＝黒でプレビュー</button>
+        <button class="btn" id="aiWhite">② 被写体＝白でプレビュー</button>
+        <button class="btn" id="aiApply" disabled>③ この結果で確定</button>
+        <button class="btn ghost" id="aiCancel" disabled>プレビュー取消</button>
+      </div>
+      <div class="aiOpts">
+        <label><input type="checkbox" id="aiBg" checked>背景も逆色</label>
+        <label><input type="checkbox" id="aiClean" checked>小ゴミ除去＋穴埋め</label>
+        <span id="aiMsg" style="color:var(--amber)"></span>
+      </div>
+      <div class="bar" id="alphaRow">
+        <button class="btn" id="alBlack">透明PNG→被写体黒</button>
+        <button class="btn" id="alWhite">被写体白</button>
+        <span style="font-size:11px;color:var(--dim)">切り抜き済みPNGはAIよりこちらが正確</span>
+      </div>
+    </details>
     <div class="bar">
       <button class="btn ghost" id="undo" disabled>戻す</button>
       <button class="btn ghost" id="redo" disabled>やり直し</button>
       <button class="btn ghost" id="fit">全体</button>
+      <div class="zoomBtns"><button class="btn ghost" id="zoomOut">−</button><button class="btn ghost" id="zoomIn">＋</button></div>
       <button class="btn ghost" id="disp">重ね</button>
       <div class="spacer"></div>
       <button class="btn" id="save">PNG書き出し</button>
     </div>
-    <div id="hint">直線はドラッグして離すと確定。水平・垂直に近いと自動でまっすぐ揃います。ワンドは画面に映っている範囲だけ塗ります。2本指で拡大・移動。</div>
+    <div id="hint">おすすめ：AI解析 → 黒/白プレビュー → 感度・境界を調整 → 確定 → 筆で細部補正。「輪郭」表示でズレを確認できます。2本指で拡大・移動。</div>
   </footer>
 </div>
 
@@ -220,9 +252,13 @@ function draw(){
   if(!srcCv)return;
   vctx.imageSmoothingEnabled=scale<1;
   vctx.save();vctx.translate(ox,oy);vctx.scale(scale,scale);
+  const shownMask=(aiPreviewActive&&aiPreviewCv)?aiPreviewCv:mask;
   if(disp===1){
-    vctx.fillStyle='#000';vctx.fillRect(0,0,W,H);vctx.drawImage(mask,0,0);
+    vctx.fillStyle='#000';vctx.fillRect(0,0,W,H);vctx.drawImage(shownMask,0,0);
   }else if(disp===2){
+    vctx.drawImage(srcCv,0,0);
+    drawMaskOutline(vctx,shownMask);
+  }else if(disp===3&&!aiPreviewActive){
     if(!foilCv)buildFoil();
     if(!workCv){workCv=document.createElement('canvas');workCv.width=W;workCv.height=H;}
     if(maskDirty&&performance.now()-lastA>110)buildMaskAlpha();
@@ -235,7 +271,7 @@ function draw(){
     vctx.drawImage(workCv,0,0);
   }else{
     vctx.drawImage(srcCv,0,0);
-    vctx.globalAlpha=.55;vctx.drawImage(mask,0,0);vctx.globalAlpha=1;
+    vctx.globalAlpha=.55;vctx.drawImage(shownMask,0,0);vctx.globalAlpha=1;
   }
   if(line){
     const e2=snapLine(line.a,line.b);
@@ -258,7 +294,7 @@ function draw(){
   }
   vctx.restore();
   hud.style.display='block';hud.textContent=Math.round(scale*100)+'%';
-  if(disp===2){cancelAnimationFrame(rafHolo);rafHolo=requestAnimationFrame(draw);}
+  if(disp===3){cancelAnimationFrame(rafHolo);rafHolo=requestAnimationFrame(draw);}
 }
 function toImg(cx,cy){const r=stage.getBoundingClientRect();
   return{x:(cx-r.left-ox)/scale,y:(cy-r.top-oy)/scale};}
@@ -276,8 +312,11 @@ function unpack(b){
 }
 /* ===== AIで被写体を判定する（端末内で処理・無料） ===== */
 let aiLib=null,aiModel=null,aiProc=null,aiName='';
+let aiProb=null,aiPreviewCv=null,aiPreviewActive=false,aiTarget='subjBlack',aiDeb=null;
 const AI_MODELS={rmbg:'briaai/RMBG-1.4', modnet:'Xenova/modnet'};
 function aiStatus(t){$('#aiMsg').textContent=t||'';}
+function aiState(t,ok){const e=$('#aiState');e.textContent=t;e.classList.toggle('ok',!!ok);}
+function resetAI(){clearTimeout(aiDeb);aiProb=null;aiPreviewCv=null;aiPreviewActive=false;$('#aiApply').disabled=true;$('#aiCancel').disabled=true;aiState('未解析',false);}
 async function aiLoad(key){
   if(!aiLib){
     aiStatus('ライブラリ取得中…');
@@ -287,76 +326,192 @@ async function aiLoad(key){
   if(aiModel&&aiName===key)return;
   aiStatus('モデル取得中…（初回のみ）');
   const id=AI_MODELS[key];
-  aiModel=await aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'},device:'webgpu',dtype:'fp32'})
-    .catch(function(){return aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'}});});
-  aiProc=await aiLib.AutoProcessor.from_pretrained(id,{config:{
-    do_normalize:true,do_pad:false,do_rescale:true,do_resize:true,
-    image_mean:[0.5,0.5,0.5],image_std:[1,1,1],
-    feature_extractor_type:'ImageFeatureExtractor',resample:2,
-    rescale_factor:0.00392156862745098,size:{width:1024,height:1024}}});
+  aiModel=await aiLib.AutoModel.from_pretrained(id,{device:'webgpu',dtype:'fp32'})
+    .catch(function(){return aiLib.AutoModel.from_pretrained(id,{dtype:'fp32'});});
+  // モデル側の公式 preprocessor_config を優先。古い環境だけ従来設定へフォールバック。
+  aiProc=await aiLib.AutoProcessor.from_pretrained(id).catch(function(){
+    return aiLib.AutoProcessor.from_pretrained(id,{config:{
+      do_normalize:true,do_pad:false,do_rescale:true,do_resize:true,
+      image_mean:[0.5,0.5,0.5],image_std:[1,1,1],
+      feature_extractor_type:'ImageFeatureExtractor',resample:2,
+      rescale_factor:0.00392156862745098,size:{width:1024,height:1024}}});
+  });
   aiName=key;
 }
-/* 被写体の確率マップ（0-255）を元画像サイズで返す */
+
+/* モデル出力を「0〜255の確率マップ」に正規化して元画像サイズへ戻す。
+   RMBG-1.4公式の後処理と同じく min-max 正規化を行う。 */
 async function aiAlpha(){
-  await aiLoad($('#aiModel').value);
-  aiStatus('解析中…');
+  const key=$('#aiModel').value;
+  await aiLoad(key);
+  aiStatus('解析中…');aiState('解析中',false);
   const raw=await aiLib.RawImage.fromURL((flatCv||srcCv).toDataURL('image/png'));
   const {pixel_values}=await aiProc(raw);
   const out=await aiModel({input:pixel_values});
-  const t=out.output||out.alphas||Object.values(out)[0];
-  const m=await aiLib.RawImage.fromTensor(t[0].mul(255).to('uint8')).resize(W,H);
-  aiStatus('');
-  return m.data;
+  let t=out.output||out.alphas||out.logits||Object.values(out)[0];
+  if(Array.isArray(t))t=t[0];
+  // 先頭の singleton 次元を外す
+  while(t&&t.dims&&t.dims.length>2&&t.dims[0]===1){
+    try{t=typeof t._getitem==='function'?t._getitem(0):t[0];}catch(e){break;}
+  }
+  if(!t||!t.data||!t.dims)throw new Error('AI output tensor not found');
+  const dims=t.dims,mh=dims[dims.length-2],mw=dims[dims.length-1],n=mw*mh;
+  const src=t.data;
+  let mn=Infinity,mx=-Infinity;
+  for(let i=0;i<n;i++){const v=Number(src[i]);if(v<mn)mn=v;if(v>mx)mx=v;}
+  const span=Math.max(1e-8,mx-mn),u8=new Uint8ClampedArray(n);
+  if(key==='rmbg' || mn<0 || mx>1.05){
+    for(let i=0;i<n;i++)u8[i]=Math.max(0,Math.min(255,Math.round((Number(src[i])-mn)/span*255)));
+  }else{
+    for(let i=0;i<n;i++)u8[i]=Math.max(0,Math.min(255,Math.round(Number(src[i])*255)));
+  }
+  const c=document.createElement('canvas');c.width=mw;c.height=mh;
+  const cc=c.getContext('2d'),im=cc.createImageData(mw,mh),d=im.data;
+  for(let i=0;i<n;i++){const v=u8[i];d[i*4]=d[i*4+1]=d[i*4+2]=v;d[i*4+3]=255;}
+  cc.putImageData(im,0,0);
+  const r=document.createElement('canvas');r.width=W;r.height=H;
+  const rc=r.getContext('2d',{willReadFrequently:true});rc.imageSmoothingEnabled=true;rc.imageSmoothingQuality='high';rc.drawImage(c,0,0,W,H);
+  const rd=rc.getImageData(0,0,W,H).data,a=new Uint8Array(W*H);
+  for(let i=0;i<a.length;i++)a[i]=rd[i*4];
+  aiStatus('');aiState('解析済み',true);
+  return a;
 }
-/* 被写体を塗る（黒＝透かさない／白＝透かす） */
-async function aiFill(target){
-  if(!srcCv){alert('先に原版を読み込んでください');return;}
-  try{
-    const a=await aiAlpha();
-    snap();
-    const im=mctx.getImageData(0,0,W,H),d=im.data;
-    const th=+$('#aiTh').value*2.55;
-    for(let i=0;i<W*H;i++){
-      if(a[i]>=th){                      // 被写体
-        const v=(target==='subjBlack')?0:255;
-        d[i*4]=d[i*4+1]=d[i*4+2]=v;
-      }else if($('#aiBg').checked){       // 背景も塗る
-        const v=(target==='subjBlack')?255:0;
-        d[i*4]=d[i*4+1]=d[i*4+2]=v;
+
+function morph(bin,r){
+  if(!r)return bin;
+  let a=bin,b=new Uint8Array(bin.length),dilate=r>0,steps=Math.abs(r);
+  for(let k=0;k<steps;k++){
+    for(let y=0;y<H;y++){
+      const row=y*W;
+      for(let x=0;x<W;x++){
+        const i=row+x;
+        if(dilate){
+          let v=a[i];
+          if(!v&&x>0)v=a[i-1]; if(!v&&x<W-1)v=a[i+1]; if(!v&&y>0)v=a[i-W]; if(!v&&y<H-1)v=a[i+W];
+          b[i]=v?1:0;
+        }else{
+          let v=a[i];
+          if(v&&x>0)v=a[i-1]; else if(x===0)v=0;
+          if(v&&x<W-1)v=a[i+1]; else if(x===W-1)v=0;
+          if(v&&y>0)v=a[i-W]; else if(y===0)v=0;
+          if(v&&y<H-1)v=a[i+W]; else if(y===H-1)v=0;
+          b[i]=v?1:0;
+        }
       }
-      d[i*4+3]=255;
     }
-    mctx.putImageData(im,0,0);maskDirty=true;draw();
-  }catch(e){aiStatus('失敗しました');console.error(e);
-    alert('解析に失敗しました。通信環境を確認してもう一度お試しください。');}
+    const z=a;a=b;b=z;
+  }
+  return a;
 }
-/* 元画像の透明度からマスクを作る（切り抜き済み画像はこれが一番正確） */
+
+function cleanRegions(bin){
+  const n=bin.length,minArea=Math.max(36,Math.min(1800,Math.round(n*0.00018)));
+  const seen=new Uint8Array(n),q=new Int32Array(n);
+  // 小さい前景ゴミを除去
+  for(let start=0;start<n;start++){
+    if(seen[start]||!bin[start])continue;
+    let h=0,t=0;q[t++]=start;seen[start]=1;
+    while(h<t){const p=q[h++],x=p%W,y=(p/W)|0;
+      let z;
+      if(x>0&&(z=p-1)>=0&&!seen[z]&&bin[z]){seen[z]=1;q[t++]=z;}
+      if(x<W-1&&!seen[z=p+1]&&bin[z]){seen[z]=1;q[t++]=z;}
+      if(y>0&&!seen[z=p-W]&&bin[z]){seen[z]=1;q[t++]=z;}
+      if(y<H-1&&!seen[z=p+W]&&bin[z]){seen[z]=1;q[t++]=z;}
+    }
+    if(t<minArea)for(let j=0;j<t;j++)bin[q[j]]=0;
+  }
+  // 小さい内部穴を埋める（画像端につながる背景は保持）
+  seen.fill(0);const holeMax=minArea*3;
+  for(let start=0;start<n;start++){
+    if(seen[start]||bin[start])continue;
+    let h=0,t=0,touch=false;q[t++]=start;seen[start]=1;
+    while(h<t){const p=q[h++],x=p%W,y=(p/W)|0;if(x===0||y===0||x===W-1||y===H-1)touch=true;
+      let z;
+      if(x>0&&!seen[z=p-1]&&!bin[z]){seen[z]=1;q[t++]=z;}
+      if(x<W-1&&!seen[z=p+1]&&!bin[z]){seen[z]=1;q[t++]=z;}
+      if(y>0&&!seen[z=p-W]&&!bin[z]){seen[z]=1;q[t++]=z;}
+      if(y<H-1&&!seen[z=p+W]&&!bin[z]){seen[z]=1;q[t++]=z;}
+      if(t>holeMax&&!touch){/* 探索は続けるが埋め対象外 */}
+    }
+    if(!touch&&t<=holeMax)for(let j=0;j<t;j++)bin[q[j]]=1;
+  }
+  return bin;
+}
+
+function makeAIBinary(){
+  if(!aiProb)return null;
+  const th=+$('#aiTh').value*2.55,bin=new Uint8Array(W*H);
+  for(let i=0;i<bin.length;i++)bin[i]=aiProb[i]>=th?1:0;
+  let out=morph(bin,+$('#aiEdge').value);
+  if($('#aiClean').checked)out=cleanRegions(out);
+  return out;
+}
+function buildAIPreview(){
+  const bin=makeAIBinary();if(!bin)return;
+  if(!aiPreviewCv){aiPreviewCv=document.createElement('canvas');aiPreviewCv.width=W;aiPreviewCv.height=H;}
+  const c=aiPreviewCv.getContext('2d'),im=c.createImageData(W,H),d=im.data;
+  const subjVal=aiTarget==='subjBlack'?0:255,bgVal=aiTarget==='subjBlack'?255:0,bg=$('#aiBg').checked;
+  const cur=bg?null:mctx.getImageData(0,0,W,H).data;
+  for(let i=0;i<bin.length;i++){
+    let v;if(bin[i])v=subjVal;else v=bg?bgVal:cur[i*4];
+    const j=i*4;d[j]=d[j+1]=d[j+2]=v;d[j+3]=255;
+  }
+  c.putImageData(im,0,0);aiPreviewActive=true;$('#aiApply').disabled=false;$('#aiCancel').disabled=false;draw();
+}
+async function aiAnalyze(){
+  if(!srcCv){alert('先に原版を読み込んでください');return;}
+  try{aiProb=await aiAlpha();buildAIPreview();}
+  catch(e){aiStatus('失敗');aiState('失敗',false);console.error(e);alert('AI解析に失敗しました。通信環境を確認してもう一度お試しください。');}
+}
+async function aiPreview(target){
+  if(!srcCv){alert('先に原版を読み込んでください');return;}
+  aiTarget=target;
+  if(!aiProb){await aiAnalyze();return;}
+  buildAIPreview();
+}
+function aiApply(){
+  if(!aiPreviewActive||!aiPreviewCv)return;snap();
+  mctx.clearRect(0,0,W,H);mctx.drawImage(aiPreviewCv,0,0);maskDirty=true;aiPreviewActive=false;$('#aiApply').disabled=true;$('#aiCancel').disabled=true;$('#aiDetails').open=false;draw();
+}
+function aiCancel(){aiPreviewActive=false;$('#aiApply').disabled=true;$('#aiCancel').disabled=true;draw();}
+function scheduleAIPreview(){clearTimeout(aiDeb);if(!aiProb)return;aiDeb=setTimeout(buildAIPreview,90);}
+
+/* 透明PNGはAIを使わず、元アルファから直接二値化 */
 function alphaFill(target){
   if(!srcAlpha){alert('先に原版を読み込んでください');return;}
   if(!hasAlpha){alert('この画像には透明部分がありません。\nAIボタンを使うか、切り抜き済みのPNGを読み込んでください。');return;}
-  snap();
+  aiCancel();snap();
   const im=mctx.getImageData(0,0,W,H),d=im.data;
   const th=+$('#aiTh').value*2.55;
   for(let i=0;i<W*H;i++){
-    if(srcAlpha[i]>=th){
-      const v=(target==='subjBlack')?0:255;
-      d[i*4]=d[i*4+1]=d[i*4+2]=v;
-    }else if($('#aiBg').checked){
-      const v=(target==='subjBlack')?255:0;
-      d[i*4]=d[i*4+1]=d[i*4+2]=v;
-    }
+    if(srcAlpha[i]>=th){const v=(target==='subjBlack')?0:255;d[i*4]=d[i*4+1]=d[i*4+2]=v;}
+    else if($('#aiBg').checked){const v=(target==='subjBlack')?255:0;d[i*4]=d[i*4+1]=d[i*4+2]=v;}
     d[i*4+3]=255;
   }
   mctx.putImageData(im,0,0);maskDirty=true;draw();
 }
+
+function drawMaskOutline(ctx,cv){
+  const c=cv.getContext('2d',{willReadFrequently:true}),d=c.getImageData(0,0,W,H).data;
+  ctx.save();ctx.fillStyle='#FF3FBF';
+  // 表示倍率に応じて間引き。輪郭は視認用なので元マスク自体は変更しない。
+  const step=scale<0.5?3:scale<1?2:1,sz=Math.max(1.2/scale,1);
+  for(let y=step;y<H-step;y+=step){
+    for(let x=step;x<W-step;x+=step){const i=(y*W+x)*4,v=d[i]>127;
+      if((d[i-step*4]>127)!==v||(d[i+step*4]>127)!==v||(d[i-step*W*4]>127)!==v||(d[i+step*W*4]>127)!==v)ctx.fillRect(x,y,sz,sz);
+    }
+  }
+  ctx.restore();
+}
+
 function snap(){
   if(!mask)return;
   undoS.push(pack());if(undoS.length>50)undoS.shift();
   redoS.length=0;btns();
 }
 function btns(){$('#undo').disabled=!undoS.length;$('#redo').disabled=!redoS.length;}
-$('#undo').onclick=function(){if(!undoS.length)return;redoS.push(pack());unpack(undoS.pop());btns();draw();};
-$('#redo').onclick=function(){if(!redoS.length)return;undoS.push(pack());unpack(redoS.pop());btns();draw();};
+$('#undo').onclick=function(){if(aiPreviewActive)aiCancel();if(!undoS.length)return;redoS.push(pack());unpack(undoS.pop());btns();draw();};
+$('#redo').onclick=function(){if(aiPreviewActive)aiCancel();if(!redoS.length)return;undoS.push(pack());unpack(redoS.pop());btns();draw();};
 
 function col(){return ink==='w'?'#fff':'#000';}
 function stroke(a,b){
@@ -421,6 +576,7 @@ stage.addEventListener('pointerdown',function(e){
   }
   lastTap=now;
   if(tool==='pan'){gest={pan:true,x:e.clientX,y:e.clientY,ox:ox,oy:oy};return;}
+  if(aiPreviewActive)aiCancel();
   const p=toImg(e.clientX,e.clientY);
   if(tool==='wand'){wand(p.x,p.y);return;}
   if(tool==='line'){painting=true;line={a:p,b:p};draw();return;}
@@ -489,11 +645,20 @@ $('#size').oninput=function(e){brush=+e.target.value;$('#szv').textContent=brush
 $('#tol').oninput=function(e){tol=+e.target.value;$('#tlv').textContent=tol;};
 $('#alBlack').onclick=function(){alphaFill('subjBlack');};
 $('#alWhite').onclick=function(){alphaFill('subjWhite');};
-$('#aiBlack').onclick=function(){aiFill('subjBlack');};
-$('#aiWhite').onclick=function(){aiFill('subjWhite');};
-$('#aiTh').oninput=function(e){$('#aiThv').textContent=e.target.value;};
+$('#aiAnalyze').onclick=aiAnalyze;
+$('#aiBlack').onclick=function(){aiPreview('subjBlack');};
+$('#aiWhite').onclick=function(){aiPreview('subjWhite');};
+$('#aiApply').onclick=aiApply;
+$('#aiCancel').onclick=aiCancel;
+$('#aiModel').onchange=function(){aiModel=null;aiProc=null;aiName='';resetAI();};
+$('#aiTh').oninput=function(e){$('#aiThv').textContent=e.target.value;scheduleAIPreview();};
+$('#aiEdge').oninput=function(e){$('#aiEdgev').textContent=e.target.value;scheduleAIPreview();};
+$('#aiClean').onchange=scheduleAIPreview;
+$('#aiBg').onchange=scheduleAIPreview;
 $('#fit').onclick=fit;
-$('#disp').onclick=function(){disp=(disp+1)%3;$('#disp').textContent=['重ね','マスク','ホイル'][disp];draw();};
+$('#disp').onclick=function(){disp=(disp+1)%4;$('#disp').textContent=['重ね','マスク','輪郭','ホイル'][disp];draw();};
+function zoomBy(k){if(!srcCv)return;const r=stage.getBoundingClientRect(),mx=r.width/2,my=r.height/2,ns=Math.max(.05,Math.min(24,scale*k));ox=mx-(mx-ox)*ns/scale;oy=my-(my-oy)*ns/scale;scale=ns;draw();}
+$('#zoomIn').onclick=function(){zoomBy(1.28);};$('#zoomOut').onclick=function(){zoomBy(1/1.28);};
 
 $('#openSrc').onclick=function(){$('#fSrc').click();};
 $('#openMask').onclick=function(){if(srcCv)$('#fMask').click();else alert('先に原版を読み込んでください');};
@@ -502,7 +667,7 @@ $('#fSrc').onchange=function(e){
   const f=e.target.files[0];if(!f)return;
   const im=new Image();
   im.onload=function(){
-    W=im.naturalWidth;H=im.naturalHeight;foilCv=null;maskA=null;workCv=null;maskDirty=true;
+    W=im.naturalWidth;H=im.naturalHeight;foilCv=null;maskA=null;workCv=null;maskDirty=true;resetAI();
     undoS.length=0;redoS.length=0;btns();
     srcCv=document.createElement('canvas');srcCv.width=W;srcCv.height=H;
     const sc=srcCv.getContext('2d',{willReadFrequently:true});sc.drawImage(im,0,0);
@@ -526,7 +691,7 @@ $('#fMask').onchange=function(e){
   const f=e.target.files[0];if(!f)return;
   const im=new Image();
   im.onload=function(){
-    snap();
+    if(aiPreviewActive)aiCancel();snap();
     mctx.fillStyle='#000';mctx.fillRect(0,0,W,H);
     mctx.drawImage(im,0,0,W,H);
     const md=mctx.getImageData(0,0,W,H),d=md.data;
@@ -543,6 +708,7 @@ function dataURLtoBlob(u){
 }
 $('#save').onclick=function(){
   if(!mask)return;
+  if(aiPreviewActive)aiApply();
   const out=document.createElement('canvas');out.width=W;out.height=H;
   const md=mctx.getImageData(0,0,W,H),d=md.data;
   for(let i=0;i<d.length;i+=4){const v=d[i]>127?255:0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=255;}
