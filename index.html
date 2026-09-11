@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>レイヤー分けマスク エディタ v2</title>
+<title>レイヤー分けマスク エディタ v3</title>
 <style>
 :root{
   --ink:#14110e;--panel:#211b16;--panel2:#2c241d;--line:#42372b;
@@ -74,6 +74,7 @@ input[type=file]{display:none}
     <div id="title">レイヤー分けマスク</div>
     <div class="spacer"></div>
     <button class="btn" id="openSrc">原版</button>
+    <button class="btn" id="assetBtn">素材</button>
     <button class="btn" id="layersBtn">レイヤー</button>
     <button class="btn" id="aiBtn">AI</button>
   </header>
@@ -164,6 +165,35 @@ input[type=file]{display:none}
   </div>
 </div>
 
+<!-- Asset sheet -->
+<div class="sheet" id="assetSheet">
+  <div class="card">
+    <div class="sheetTitle"><b>素材取り込み</b><div class="spacer"></div><button class="btn ghost closeSheet">閉じる</button></div>
+    <div class="aiBlock">
+      <div class="bar"><label class="sl">黒背景しきい値<input type="range" id="matThr" min="0" max="80" value="8"><b id="matThrV">8</b></label></div>
+      <div class="bar"><label class="check"><input type="checkbox" id="matClear" checked>取り込み前に現在レイヤーを消去</label></div>
+      <div class="sheetActions">
+        <button class="btn good" id="srcToLayer">原版の見えている部分 → 現在レイヤー</button>
+      </div>
+    </div>
+    <div class="aiBlock">
+      <div class="bar">
+        <select id="auxMode" class="btn">
+          <option value="auto">自動（透過優先 / なければ黒背景除去）</option>
+          <option value="blackbg">黒背景除去</option>
+          <option value="alpha">透明度をそのまま使う</option>
+        </select>
+      </div>
+      <div class="note" id="auxName">別画像が未選択です</div>
+      <div class="sheetActions">
+        <button class="btn" id="openAux">別画像を選ぶ</button>
+        <button class="btn good" id="auxToLayer">別画像 → 現在レイヤー</button>
+      </div>
+    </div>
+    <div class="note">おすすめ手順：①原版を読み込む → ②「主役」を選んで「原版の見えている部分 → 現在レイヤー」→ ③「前エフェクト」または「後ろエフェクト」を選んで別画像としてエフェクトを取り込む → ④最終マスクを書き出し。黒背景除去は、外周とつながった黒だけを背景扱いするので、人物内部の黒い部分は穴になりにくいです。</div>
+  </div>
+</div>
+
 <!-- Export sheet -->
 <div class="sheet" id="exportSheet">
   <div class="card">
@@ -184,6 +214,7 @@ input[type=file]{display:none}
 </div>
 
 <input type="file" id="fSrc" accept="image/*">
+<input type="file" id="fAux" accept="image/*">
 <div id="toast"></div>
 
 <script>
@@ -194,6 +225,7 @@ let layers=[],active=0,protectCv=null,protectCtx=null;
 let tool='brush',mode='add',brush=42,tol=26,viewMode=0;
 let lasso=[],line=null,painting=false,last=null,gest=null,lastTap=0;
 const pts=new Map();
+let auxData=null,auxLoadedName='';
 let aiLib=null,aiModel=null,aiProc=null,aiName='',aiProb=null,aiAdjusted=null,aiDirty=true;
 const AI_MODELS={rmbg:'briaai/RMBG-1.4',modnet:'Xenova/modnet'};
 const undoS=[],redoS=[];
@@ -287,7 +319,7 @@ $('#deleteLayer').onclick=()=>{if(layers.length<=1){alert('最後の1枚は削�
 $('#clearProtect').onclick=()=>{if(!protectCv)return;snap();clearCanvas(protectCv);draw();toast('保護を消去しました')};
 
 function showSheet(id){$(id).classList.add('on')}function hideSheets(){$$('.sheet').forEach(s=>s.classList.remove('on'))}
-$('#layersBtn').onclick=()=>{refreshLayerUI();showSheet('#layersSheet')};$('#aiBtn').onclick=()=>showSheet('#aiSheet');$('#exportBtn').onclick=()=>{refreshExportPreview('final');showSheet('#exportSheet')};$$('.closeSheet').forEach(b=>b.onclick=hideSheets);$$('.sheet').forEach(s=>s.addEventListener('click',e=>{if(e.target===s)hideSheets()}));
+$('#assetBtn').onclick=()=>showSheet('#assetSheet');$('#layersBtn').onclick=()=>{refreshLayerUI();showSheet('#layersSheet')};$('#aiBtn').onclick=()=>showSheet('#aiSheet');$('#exportBtn').onclick=()=>{refreshExportPreview('final');showSheet('#exportSheet')};$$('.closeSheet').forEach(b=>b.onclick=hideSheets);$$('.sheet').forEach(s=>s.addEventListener('click',e=>{if(e.target===s)hideSheets()}));
 
 async function aiLoad(key){if(!aiLib){$('#aiMsg').textContent='ライブラリ取得中…';aiLib=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3');aiLib.env.allowLocalModels=false}if(aiModel&&aiName===key)return;$('#aiMsg').textContent='モデル取得中…（初回のみ）';const id=AI_MODELS[key];aiModel=await aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'},device:'webgpu',dtype:'fp32'}).catch(()=>aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'}}));aiProc=await aiLib.AutoProcessor.from_pretrained(id,{config:{do_normalize:true,do_pad:false,do_rescale:true,do_resize:true,image_mean:[.5,.5,.5],image_std:[1,1,1],feature_extractor_type:'ImageFeatureExtractor',resample:2,rescale_factor:.00392156862745098,size:{width:1024,height:1024}}});aiName=key}
 async function aiAnalyze(){if(!srcCv){alert('先に原版を読み込んでください');return}setBusy(true,'AI解析中…');try{await aiLoad($('#aiModel').value);$('#aiMsg').textContent='解析中…';const flat=makeCanvas(),fc=flat.getContext('2d');fc.fillStyle='#fff';fc.fillRect(0,0,W,H);fc.drawImage(srcCv,0,0);const raw=await aiLib.RawImage.fromURL(flat.toDataURL('image/png'));const {pixel_values}=await aiProc(raw);const out=await aiModel({input:pixel_values});const t=out.output||out.alphas||Object.values(out)[0];const m=await aiLib.RawImage.fromTensor(t[0].mul(255).to('uint8')).resize(W,H);let arr=m.data;if(arr.length!==W*H){const ch=Math.round(arr.length/(W*H));const g=new Uint8Array(W*H);for(let i=0;i<g.length;i++)g[i]=arr[i*ch];arr=g}let mn=255,mx=0;for(const v of arr){if(v<mn)mn=v;if(v>mx)mx=v}aiProb=new Uint8Array(W*H);const den=Math.max(1,mx-mn);for(let i=0;i<aiProb.length;i++)aiProb[i]=Math.max(0,Math.min(255,Math.round((arr[i]-mn)*255/den)));aiDirty=true;aiAdjusted=null;$('#aiMsg').textContent='解析完了。感度・境界を調整できます';draw()}catch(e){console.error(e);$('#aiMsg').textContent='AI解析に失敗しました';alert('AI解析に失敗しました。通信環境、WebGPU対応、モデル読み込みを確認してください。')}finally{setBusy(false)}}
@@ -298,6 +330,43 @@ $('#alphaToLayer').onclick=()=>{if(!srcCv)return;let transparent=0;for(let i=0;i
 $('#applyAI').onclick=()=>{if(!aiProb){aiAnalyze();return}snap();applyAIMaskTo(active,false);if($('#exclusive').checked){const a=adjustedAI(),prot=protectCtx.getImageData(0,0,W,H).data;for(let k=0;k<layers.length;k++){if(k===active)continue;const c=ctxOf(k),im=c.getImageData(0,0,W,H),d=im.data;for(let i=0;i<W*H;i++)if(a[i]&&prot[i*4+3]<128){const j=i*4;d[j+3]=0}c.putImageData(im,0,0)}}draw();toast(`AI候補 → ${activeLayer().name}`)};
 $('#makeBg').onclick=()=>{if(!aiProb){alert('先にAI解析してください');return}let idx=layers.findIndex(l=>l.name==='背景');if(idx<0){layers.push({name:'背景',cv:makeCanvas(),visible:true,color:'#b77cff',role:'white'});idx=layers.length-1}snap();applyAIMaskTo(idx,true);refreshLayerUI();draw();toast('背景レイヤーを作成しました')};
 
+function buildMaskFromRGBA(data,w,h,mode='auto',thr=8){
+  const n=w*h,out=new Uint8Array(n);
+  let transparent=0;
+  for(let i=0;i<n;i++) if(data[i*4+3]<250) transparent++;
+  if(mode==='alpha'||(mode==='auto'&&transparent>n*0.001)){
+    for(let i=0;i<n;i++) out[i]=data[i*4+3]>=128?1:0;
+    return out;
+  }
+  const cand=new Uint8Array(n),bg=new Uint8Array(n),st=[];
+  for(let i=0;i<n;i++){const j=i*4,a=data[j+3],m=Math.max(data[j],data[j+1],data[j+2]); cand[i]=(a>=8&&m<=thr)?1:0;}
+  function push(p){if(p<0||p>=n||bg[p]||!cand[p])return; bg[p]=1; st.push(p)}
+  for(let x=0;x<w;x++){push(x); push((h-1)*w+x)}
+  for(let y=1;y<h-1;y++){push(y*w); push(y*w+(w-1))}
+  while(st.length){const p=st.pop(),x=p%w,y=(p/w)|0; if(x>0)push(p-1); if(x<w-1)push(p+1); if(y>0)push(p-w); if(y<h-1)push(p+w)}
+  for(let i=0;i<n;i++){const a=data[i*4+3]; out[i]=(!bg[i]&&a>=8)?1:0}
+  return out;
+}
+function applyBinaryToActive(arr,clearFirst=true,label='取り込み完了'){
+  if(!srcCv||!activeLayer()) return;
+  snap();
+  const c=activeCtx(),im=c.getImageData(0,0,W,H),d=im.data,prot=protectCtx.getImageData(0,0,W,H).data,[r,g,b]=hexRgb(activeLayer().color);
+  if(clearFirst){for(let i=0;i<d.length;i+=4){d[i]=d[i+1]=d[i+2]=0; d[i+3]=0;}}
+  for(let i=0;i<W*H;i++){ if(!arr[i]) continue; const j=i*4; if(prot[j+3]>127) continue; d[j]=r; d[j+1]=g; d[j+2]=b; d[j+3]=255; }
+  c.putImageData(im,0,0);
+  if($('#exclusive').checked){
+    for(let k=0;k<layers.length;k++){ if(k===active) continue; const x=ctxOf(k),mi=x.getImageData(0,0,W,H),md=mi.data; let changed=false;
+      for(let i=0;i<W*H;i++){ if(!arr[i]) continue; const j=i*4; if(prot[j+3]>127) continue; if(md[j+3]){md[j+3]=0; changed=true;}}
+      if(changed) x.putImageData(mi,0,0);
+    }
+  }
+  draw(); toast(label);
+}
+$('#matThr').oninput=e=>$('#matThrV').textContent=e.target.value;
+$('#srcToLayer').onclick=()=>{ if(!srcCv){alert('先に原版を読み込んでください');return} const arr=buildMaskFromRGBA(sdata,W,H,'blackbg',+$('#matThr').value); applyBinaryToActive(arr,$('#matClear').checked,'原版 → '+(activeLayer()?.name||'現在レイヤー')); };
+$('#openAux').onclick=()=>$('#fAux').click();
+$('#fAux').onchange=e=>{const f=e.target.files[0]; if(!f) return; const im=new Image(); im.onload=()=>{ if(!srcCv){alert('先に原版を読み込んでください'); return } const tmp=makeCanvas(),tc=tmp.getContext('2d',{willReadFrequently:true}); tc.clearRect(0,0,W,H); tc.drawImage(im,0,0,W,H); auxData=tc.getImageData(0,0,W,H).data; auxLoadedName=f.name; $('#auxName').textContent='選択中: '+f.name+' ('+im.naturalWidth+'×'+im.naturalHeight+')'; showSheet('#assetSheet'); toast('別画像を読み込みました'); }; im.src=URL.createObjectURL(f); e.target.value='';};
+$('#auxToLayer').onclick=()=>{ if(!srcCv){alert('先に原版を読み込んでください');return} if(!auxData){alert('先に別画像を選んでください');return} const arr=buildMaskFromRGBA(auxData,W,H,$('#auxMode').value,+$('#matThr').value); applyBinaryToActive(arr,$('#matClear').checked,'別画像 → '+(activeLayer()?.name||'現在レイヤー')); };
 function transparentLayerCanvas(i){const out=makeCanvas(),c=out.getContext('2d');c.drawImage(srcCv,0,0);c.globalCompositeOperation='destination-in';c.drawImage(layers[i].cv,0,0);return out}
 function maskCanvas(i){const out=makeCanvas(),c=out.getContext('2d'),src=ctxOf(i).getImageData(0,0,W,H).data,md=c.createImageData(W,H),d=md.data;for(let p=0;p<d.length;p+=4){const v=src[p+3]>127?255:0;d[p]=d[p+1]=d[p+2]=v;d[p+3]=255}c.putImageData(md,0,0);return out}
 function finalMaskCanvas(){const out=makeCanvas(),c=out.getContext('2d'),md=c.createImageData(W,H),d=md.data;const maps=layers.map(l=>l.cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data);for(let i=0;i<W*H;i++){let isBlack=false,isWhite=false;for(let k=0;k<layers.length;k++){const l=layers[k];if(!l.visible)continue;const a=maps[k][i*4+3]>127;if(!a)continue;const role=l.role||'skip';if(role==='black'){isBlack=true;break}else if(role==='white'){isWhite=true}}const j=i*4;const v=isBlack?0:255;d[j]=d[j+1]=d[j+2]=v;d[j+3]=255;}c.putImageData(md,0,0);return out}
