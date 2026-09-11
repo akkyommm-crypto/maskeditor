@@ -1,387 +1,170 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>レイヤー分けマスク エディタ v4</title>
+<title>本体＋エフェクト 合成ツール v2</title>
 <style>
-:root{
-  --ink:#14110e;--panel:#211b16;--panel2:#2c241d;--line:#42372b;
-  --amber:#f0aa42;--text:#eee7dd;--dim:#a69a88;--good:#6fd19d;--warn:#ff7a7a;
-}
+:root{--bg:#15120f;--panel:#211b16;--panel2:#2d251e;--line:#44382c;--amber:#efa945;--text:#eee7dc;--dim:#9d9180;--good:#82d7a7;--bad:#ff8d8d}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-html,body{margin:0;height:100%;overflow:hidden;background:var(--ink);color:var(--text);font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
-button,select,input{font-family:inherit}
-button{cursor:pointer}
-#app{display:flex;flex-direction:column;height:100dvh}
-header{display:flex;align-items:center;gap:7px;padding:8px 9px;background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
-#title{font-size:11px;font-weight:800;letter-spacing:.13em;color:var(--amber);white-space:nowrap}
-.spacer{flex:1}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif}
+button,input{font:inherit}button{cursor:pointer}
+#app{height:100dvh;display:flex;flex-direction:column}
+header{display:flex;gap:6px;align-items:center;padding:8px 9px;background:var(--panel);border-bottom:1px solid var(--line)}
+#ttl{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--amber);white-space:nowrap}.sp{flex:1}
 .btn{border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--text);padding:8px 10px;font-size:12px;white-space:nowrap}
-.btn:active{filter:brightness(1.18)}
-.btn.on{background:var(--amber);border-color:var(--amber);color:#1c1409;font-weight:800}
-.btn.good{border-color:#477d63;color:#b9f2d2}
-.btn.warn{border-color:#874747;color:#ffbbbb}
-.btn.ghost{background:transparent;border-color:transparent;color:var(--dim)}
-.btn:disabled{opacity:.35}
-#stage{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:none;background:repeating-conic-gradient(#1b1815 0% 25%,#221d18 0% 50%) 50%/20px 20px}
-#view{position:absolute;inset:0;display:block}
-#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:28px;color:var(--dim);font-size:13px;line-height:1.8}
-#hud{position:absolute;left:9px;top:9px;background:rgba(16,13,10,.78);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:10px;color:var(--dim);pointer-events:none;display:none}
-#dot{position:absolute;border:1.5px solid var(--amber);border-radius:50%;pointer-events:none;display:none;transform:translate(-50%,-50%)}
-#busy{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,6,4,.7);z-index:8}
-#busy.on{display:flex}
-#busy>div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 16px;font-size:12px;color:var(--amber)}
-footer{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);padding:7px 8px calc(9px + env(safe-area-inset-bottom));max-height:45dvh;overflow:auto}
-.bar{display:flex;align-items:center;gap:6px}.bar+.bar{margin-top:6px}
-.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:0 0 auto}
-.seg button{border:0;border-right:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:11px;padding:8px 9px}.seg button:last-child{border-right:0}.seg button.on{background:var(--amber);color:#1b1309;font-weight:800}
+.btn.on{background:var(--amber);border-color:var(--amber);color:#1d1408;font-weight:800}.btn.good{border-color:#477c60;color:#c5f2d6}.btn.bad{border-color:#7f4444;color:#ffc5c5}.btn:disabled{opacity:.35}
+#stage{position:relative;flex:1;min-height:0;overflow:hidden;touch-action:none;background:repeating-conic-gradient(#1b1814 0 25%,#231e19 0 50%) 50%/20px 20px}
+#cv{position:absolute;inset:0;display:block}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--dim);font-size:13px;line-height:1.8;padding:24px}
+#hud{position:absolute;left:8px;top:8px;background:#000a;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:10px;color:var(--dim);display:none;pointer-events:none;max-width:70vw}
+#dot{position:absolute;border:1.5px solid var(--amber);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;display:none}
+footer{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);padding:7px 8px calc(9px + env(safe-area-inset-bottom));max-height:50dvh;overflow:auto}
+.bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.bar+.bar{margin-top:6px}
 .tools{display:flex;gap:5px;flex:1;min-width:0}.tools .btn{flex:1;padding:8px 4px}
-label.sl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);flex:1;min-width:0}
-label.sl input[type=range]{flex:1;min-width:58px;accent-color:var(--amber)}
-label.sl b{width:28px;text-align:right;color:var(--text);font-variant-numeric:tabular-nums}
-#hint{font-size:10px;color:var(--dim);line-height:1.45;margin-top:6px}
-input[type=file]{display:none}
-[hidden]{display:none!important}
-
-/* sheets */
-.sheet{position:fixed;inset:0;background:rgba(8,6,4,.76);display:none;align-items:flex-end;justify-content:center;z-index:20}
-.sheet.on{display:flex}
-.card{width:min(720px,100%);max-height:82dvh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0;padding:13px}
-.sheetTitle{display:flex;align-items:center;gap:8px;margin-bottom:10px}.sheetTitle b{font-size:13px;color:var(--amber)}
-.layerRow{display:grid;grid-template-columns:36px 1fr auto auto auto auto;gap:6px;align-items:center;padding:7px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);margin-bottom:6px}
-.layerRow.active{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
-.eye,.mini{border:1px solid var(--line);border-radius:7px;background:#1c1713;color:var(--text);padding:7px 8px;font-size:11px}
-.roleSel{min-width:58px;padding:6px 6px;background:#1c1713;color:var(--text);border:1px solid var(--line);border-radius:7px;font-size:11px}
-.layerName{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.layerMeta{font-size:9px;color:var(--dim);margin-top:2px}
-.swatch{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:-1px}
-.sheetActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-.sheetActions .btn{flex:1;min-width:110px}
-#aiSheet .card{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
-.aiGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.aiGrid .btn{width:100%}
-.aiBlock{border:1px solid var(--line);border-radius:9px;background:var(--panel2);padding:9px;margin-top:8px}
-.aiBlock .bar:first-child{margin-top:0}
-.note{font-size:10px;color:var(--dim);line-height:1.5;margin-top:7px}
-.check{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--dim)}
-#exportPreview{width:100%;max-height:48dvh;object-fit:contain;background:#000;border-radius:8px;border:1px solid var(--line)}
-#toast{position:fixed;left:50%;bottom:calc(115px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(0,0,0,.86);color:#fff;border:1px solid #555;padding:7px 10px;border-radius:999px;font-size:11px;z-index:50;opacity:0;pointer-events:none;transition:opacity .18s}
-#toast.on{opacity:1}
+label.sl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);flex:1;min-width:0}label.sl input{flex:1;min-width:55px;accent-color:var(--amber)}label.sl b{width:38px;text-align:right;color:var(--text);font-variant-numeric:tabular-nums}
+.hint{font-size:10px;color:var(--dim);line-height:1.45;margin-top:6px}input[type=file]{display:none}
+details{margin-top:6px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:7px 9px}summary{font-size:11px;color:var(--dim);cursor:pointer}
+#autoTools .btn{flex:1}
+.sheet{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;padding:16px;z-index:20}.sheet.on{display:flex}.card{width:min(460px,100%);max-height:92dvh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}.card img{display:block;width:100%;max-height:60dvh;object-fit:contain;background:#000;border:1px solid var(--line);border-radius:8px}.acts{display:flex;gap:7px;margin-top:10px}.acts .btn{flex:1}.note{font-size:10px;color:var(--dim);line-height:1.5;margin-top:8px}
+#busy{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:30}#busy.on{display:flex}.busyCard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;color:var(--text);font-size:13px}
 </style>
 </head>
 <body>
 <div id="app">
-  <header>
-    <div id="title">レイヤー分けマスク</div>
-    <div class="spacer"></div>
-    <button class="btn" id="openSrc">原版</button>
-    <button class="btn" id="assetBtn">素材</button>
-    <button class="btn" id="layersBtn">レイヤー</button>
-    <button class="btn" id="aiBtn">AI</button>
-  </header>
-
-  <div id="stage">
-    <canvas id="view"></canvas>
-    <div id="dot"></div>
-    <div id="hud"></div>
-    <div id="empty">「原版」で画像を読み込む<br>AIで主役候補 → レイヤーへ分割 → 最後に「人物=黒 / エフェクト=白」で書き出し</div>
-    <div id="busy"><div id="busyText">処理中…</div></div>
+<header>
+  <div id="ttl">本体＋エフェクト v2</div><div class="sp"></div>
+  <button class="btn" id="loadBody">本体</button>
+  <button class="btn" id="loadFx">エフェクト</button>
+  <button class="btn" id="undo">戻す</button>
+  <button class="btn good" id="export">書出</button>
+</header>
+<div id="stage"><canvas id="cv"></canvas><div id="dot"></div><div id="hud"></div><div id="empty">① 本体画像を選ぶ<br>② 必要なら「自動抽出」で本体を作る<br>③ 手動で本体やエフェクトを少し直す</div></div>
+<footer>
+  <div class="bar">
+    <div class="tools" id="targetBtns">
+      <button class="btn on" data-target="body">本体を編集</button>
+      <button class="btn" data-target="fx">エフェクトを編集</button>
+    </div>
+    <button class="btn" id="fit">全体</button>
+    <button class="btn" id="viewBtn">完成</button>
+  </div>
+  <div class="bar" id="bodyModes">
+    <div class="tools" id="bodyModeBtns">
+      <button class="btn on" data-bmode="add">黒く塗る</button>
+      <button class="btn" data-bmode="erase">消す</button>
+    </div>
+    <button class="btn" id="bodyAll">全部黒</button>
+  </div>
+  <div class="bar" id="fxModes" style="display:none">
+    <div class="tools" id="fxModeBtns">
+      <button class="btn" data-fmode="front">前に出す</button>
+      <button class="btn on" data-fmode="back">後ろへ</button>
+      <button class="btn" data-fmode="erase">消す</button>
+    </div>
+    <button class="btn" id="resetSplit">分け直す</button>
+  </div>
+  <div class="bar">
+    <label class="sl">ブラシ<input type="range" id="brush" min="8" max="260" value="70"><b id="brushV">70</b></label>
   </div>
 
-  <footer>
-    <div class="bar">
-      <div class="seg" id="paintMode">
-        <button data-mode="add" class="on">追加</button>
-        <button data-mode="erase">消去</button>
-        <button data-mode="protect">保護</button>
-        <button data-mode="unprotect">保護消</button>
-      </div>
-      <label class="sl" id="sizeWrap">太さ<input type="range" id="size" min="3" max="220" value="42"><b id="sizeV">42</b></label>
-      <label class="sl" id="tolWrap" hidden>許容<input type="range" id="tol" min="2" max="90" value="26"><b id="tolV">26</b></label>
+  <details open>
+    <summary>自動抽出</summary>
+    <div class="bar" id="autoTools" style="margin-top:7px">
+      <button class="btn" id="autoAlpha">透過から本体</button>
+      <button class="btn" id="autoDark">黒背景から本体</button>
+      <button class="btn good" id="runAI">AIで本体</button>
     </div>
-    <div class="bar">
-      <div class="tools">
-        <button class="btn on" data-tool="brush">筆</button>
-        <button class="btn" data-tool="line">直線</button>
-        <button class="btn" data-tool="lasso">囲む</button>
-        <button class="btn" data-tool="wand">ワンド</button>
-        <button class="btn" data-tool="seed">AI種点</button>
-        <button class="btn" data-tool="pan">移動</button>
-      </div>
-    </div>
-    <div class="bar">
-      <button class="btn" id="viewMode">色分け</button>
-      <button class="btn" id="fit">全体</button>
-      <button class="btn" id="zoomOut">−</button>
-      <button class="btn" id="zoomIn">＋</button>
-      <button class="btn ghost" id="undo" disabled>戻す</button>
-      <button class="btn ghost" id="redo" disabled>やり直し</button>
-      <div class="spacer"></div>
-      <button class="btn good" id="exportBtn">書出</button>
-    </div>
-    <div class="bar">
-      <label class="check"><input type="checkbox" id="exclusive" checked>追加した場所を他レイヤーから自動で抜く</label>
-      <div class="spacer"></div>
-      <span id="activeLabel" style="font-size:10px;color:var(--amber)">—</span>
-    </div>
-    <div id="hint">おすすめ：原版を主役に、別画像をエフェクトに取り込む → 必要なら前後のレイヤーへ分ける → レイヤーごとに「黒 / 白 / なし」を設定 → 最後に完成イラストと黒塗り画像を書き出す。</div>
-  </footer>
+    <div class="bar"><label class="sl">黒背景しきい値<input type="range" id="bodyThr" min="0" max="80" value="12"><b id="bodyThrV">12</b></label></div>
+    <div class="bar"><label class="sl">AI感度<input type="range" id="aiThr" min="0" max="255" value="140"><b id="aiThrV">140</b></label></div>
+    <div class="bar"><label class="sl">光の感度<input type="range" id="fxThr" min="0" max="220" value="18"><b id="fxThrV">18</b></label></div>
+    <div class="hint" id="aiMsg">透過PNGなら「透過から本体」、黒背景画像なら「黒背景から本体」、難しい画像だけ「AIで本体」。その後は手動ブラシで修正。</div>
+  </details>
+
+  <details>
+    <summary>エフェクト位置</summary>
+    <div class="bar" style="margin-top:7px"><label class="sl">横<input type="range" id="fxX" min="-600" max="600" value="0"><b id="fxXV">0</b></label></div>
+    <div class="bar"><label class="sl">縦<input type="range" id="fxY" min="-600" max="600" value="0"><b id="fxYV">0</b></label></div>
+    <div class="bar"><label class="sl">大きさ<input type="range" id="fxScale" min="20" max="300" value="100"><b id="fxScaleV">100</b></label></div>
+    <div class="hint">エフェクト画像は縦横比を保ったまま動かします。前の版のようにキャンバス全体へ無理に引き伸ばさないので、位置ズレしにくくしました。</div>
+  </details>
+
+  <div class="hint">完成イラストは「後ろエフェクト → 本体 → 前エフェクト」で合成。黒塗り画像は「白背景 → 後ろエフェクト白 → 本体黒 → 前エフェクト白」で作ります。</div>
+</footer>
 </div>
-
-<!-- Layers sheet -->
-<div class="sheet" id="layersSheet">
-  <div class="card">
-    <div class="sheetTitle"><b>レイヤー</b><div class="spacer"></div><button class="btn ghost closeSheet">閉じる</button></div>
-    <div id="layerList"></div>
-    <div class="sheetActions">
-      <button class="btn" id="addLayer">＋ 新規レイヤー</button>
-      <button class="btn" id="renameLayer">名前変更</button>
-      <button class="btn warn" id="deleteLayer">削除</button>
-      <button class="btn" id="clearProtect">保護を全消去</button>
-    </div>
-    <div class="note">上にあるレイヤーほど手前。各レイヤーに「黒 / 白 / 出力しない」の役割を付けられます。レイヤーごとに、原版由来か別画像由来かも保持されます。黒塗り画像では黒が優先されます。</div>
-  </div>
-</div>
-
-<!-- AI sheet -->
-<div class="sheet" id="aiSheet">
-  <div class="card">
-    <div class="sheetTitle"><b>AI 主役候補</b><div class="spacer"></div><button class="btn ghost closeSheet">閉じる</button></div>
-    <div class="aiGrid">
-      <select id="aiModel" class="btn"><option value="rmbg">RMBG-1.4 高精度</option><option value="modnet">MODNet 人物特化</option></select>
-      <button class="btn" id="runAI">AI解析</button>
-    </div>
-    <div class="aiBlock">
-      <div class="bar"><label class="sl">感度<input type="range" id="aiTh" min="5" max="95" value="50"><b id="aiThV">50</b></label></div>
-      <div class="bar"><label class="sl">境界<input type="range" id="edgeGrow" min="-5" max="5" value="0"><b id="edgeGrowV">0</b></label></div>
-      <div class="bar"><label class="check"><input type="checkbox" id="aiPreview" checked>候補を画面に表示</label></div>
-      <div class="sheetActions">
-        <button class="btn good" id="applyAI">候補を現在レイヤーへ</button>
-        <button class="btn" id="makeBg">逆マスクを「背景」に作る</button>
-        <button class="btn" id="alphaToLayer">透明度→現在レイヤー</button>
-      </div>
-      <div class="note">解析は1回だけ。感度・境界は再解析せず調整できます。緑の保護領域はAI適用時に変更しません。</div>
-      <div id="aiMsg" class="note" style="color:var(--amber)"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Asset sheet -->
-<div class="sheet" id="assetSheet">
-  <div class="card">
-    <div class="sheetTitle"><b>素材取り込み</b><div class="spacer"></div><button class="btn ghost closeSheet">閉じる</button></div>
-    <div class="aiBlock">
-      <div class="bar"><label class="sl">黒背景しきい値<input type="range" id="matThr" min="0" max="80" value="8"><b id="matThrV">8</b></label></div>
-      <div class="bar"><label class="check"><input type="checkbox" id="matClear" checked>取り込み前に現在レイヤーを消去</label></div>
-      <div class="sheetActions">
-        <button class="btn good" id="srcToLayer">原版の見えている部分 → 現在レイヤー</button>
-      </div>
-    </div>
-    <div class="aiBlock">
-      <div class="bar">
-        <select id="auxMode" class="btn">
-          <option value="auto">自動（透過優先 / なければ黒背景除去）</option>
-          <option value="blackbg">黒背景除去</option>
-          <option value="alpha">透明度をそのまま使う</option>
-        </select>
-      </div>
-      <div class="note" id="auxName">別画像が未選択です</div>
-      <div class="sheetActions">
-        <button class="btn" id="openAux">別画像を選ぶ</button>
-        <button class="btn good" id="auxToLayer">別画像 → 現在レイヤー</button>
-      </div>
-    </div>
-    <div class="note">おすすめ手順：①原版を読み込む → ②「主役」を選んで「原版の見えている部分 → 現在レイヤー」→ ③「前エフェクト」または「後ろエフェクト」を選んで別画像としてエフェクトを取り込む → ④最終マスクを書き出し。黒背景除去は、外周とつながった黒だけを背景扱いするので、人物内部の黒い部分は穴になりにくいです。</div>
-  </div>
-</div>
-
-<!-- Export sheet -->
-<div class="sheet" id="exportSheet">
-  <div class="card">
-    <div class="sheetTitle"><b>書き出し</b><div class="spacer"></div><button class="btn ghost closeSheet">閉じる</button></div>
-    <img id="exportPreview" alt="preview">
-    <div class="sheetActions">
-      <button class="btn" id="prevComposite">完成イラストを表示</button>
-      <button class="btn" id="prevBlack">黒塗り画像を表示</button>
-    </div>
-    <div class="sheetActions">
-      <button class="btn good" id="expComposite">完成イラストPNG</button>
-      <button class="btn good" id="expBlack">黒塗り画像PNG</button>
-    </div>
-    <div class="note">完成イラストPNGは、表示中の各レイヤーを前後順に合成した透過画像です。黒塗り画像PNGは「黒=人物など透けさせない / 白=エフェクト・背景など透ける」の完全二値です。</div>
-  </div>
-</div>
-
-<input type="file" id="fSrc" accept="image/*">
-<input type="file" id="fAux" accept="image/*">
-<div id="toast"></div>
-
+<input id="fBody" type="file" accept="image/*"><input id="fFx" type="file" accept="image/*">
+<div class="sheet" id="sheet"><div class="card"><img id="outPreview"><div class="acts"><button class="btn" id="showArt">完成イラスト</button><button class="btn" id="showMask">黒塗り画像</button></div><div class="acts"><button class="btn good" id="saveArt">完成イラストPNG</button><button class="btn good" id="saveMask">黒塗り画像PNG</button></div><div class="acts"><button class="btn" id="close">閉じる</button></div><div class="note">完成イラストは透過PNG。黒塗り画像は黒=本体、白=エフェクト・背景です。</div></div></div>
+<div id="busy"><div class="busyCard" id="busyText">AI解析中…</div></div>
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const view=$('#view'),vctx=view.getContext('2d'),stage=$('#stage'),dot=$('#dot'),hud=$('#hud');
-let srcCv=null,sdata=null,W=0,H=0,scale=1,ox=0,oy=0;
-let layers=[],active=0,protectCv=null,protectCtx=null;
-let tool='brush',mode='add',brush=42,tol=26,viewMode=0;
-let lasso=[],line=null,painting=false,last=null,gest=null,lastTap=0;
-const pts=new Map();
-let auxData=null,auxLoadedName='',auxCv=null;
-let aiLib=null,aiModel=null,aiProc=null,aiName='',aiProb=null,aiAdjusted=null,aiDirty=true;
-const AI_MODELS={rmbg:'briaai/RMBG-1.4',modnet:'Xenova/modnet'};
-const undoS=[],redoS=[];
-
-function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),1600)}
-function setBusy(on,t='処理中…'){$('#busyText').textContent=t;$('#busy').classList.toggle('on',!!on)}
-function makeCanvas(){const c=document.createElement('canvas');c.width=W;c.height=H;return c}
-function newLayerColor(i){const p=['#ff5f83','#ffad45','#55d98b','#49b9ff','#b77cff','#f46ee5','#64d6cc','#ffd85a'];return p[i%p.length]}
-function layerColor(i){return layers[i]?.color||newLayerColor(i)}
-function defaultLayers(){
-  layers=[
-    {name:'前エフェクト',cv:makeCanvas(),visible:true,color:'#ff5f83',role:'white',source:'aux'},
-    {name:'手前パーツ',cv:makeCanvas(),visible:true,color:'#ffad45',role:'black',source:'src'},
-    {name:'主役',cv:makeCanvas(),visible:true,color:'#55d98b',role:'black',source:'src'},
-    {name:'後ろエフェクト',cv:makeCanvas(),visible:true,color:'#49b9ff',role:'white',source:'aux'},
-    {name:'背景',cv:makeCanvas(),visible:true,color:'#b77cff',role:'white',source:'src'}
-  ];
-  active=2;
-}
-function ctxOf(i){return layers[i].cv.getContext('2d',{willReadFrequently:true})}
-function clearCanvas(c){const x=c.getContext('2d');x.clearRect(0,0,W,H)}
-function resize(){const r=stage.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);view.width=r.width*d;view.height=r.height*d;view.style.width=r.width+'px';view.style.height=r.height+'px';draw()}
-function fit(){if(!srcCv)return;const r=stage.getBoundingClientRect();scale=Math.min(r.width/W,r.height/H)*0.95;ox=(r.width-W*scale)/2;oy=(r.height-H*scale)/2;draw()}
-function zoomAt(k,cx,cy){if(!srcCv)return;const r=stage.getBoundingClientRect(),mx=(cx??(r.left+r.width/2))-r.left,my=(cy??(r.top+r.height/2))-r.top;const ns=Math.max(.05,Math.min(30,scale*k));ox=mx-(mx-ox)*ns/scale;oy=my-(my-oy)*ns/scale;scale=ns;draw()}
-function toImg(cx,cy){const r=stage.getBoundingClientRect();return{x:(cx-r.left-ox)/scale,y:(cy-r.top-oy)/scale}}
-function activeLayer(){return layers[active]||null}
-function activeCtx(){return activeLayer()?.cv.getContext('2d',{willReadFrequently:true})}
-
-function packCanvas(c){const d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data,n=W*H,out=new Uint8Array((n+7)>>3);for(let i=0;i<n;i++)if(d[i*4+3]>127)out[i>>3]|=1<<(i&7);return out}
-function hexRgb(hex){const h=hex.replace('#','');return h.length===6?[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]:[255,255,255]}
-function unpackCanvas(c,b,color='#ffffff'){const x=c.getContext('2d'),im=x.createImageData(W,H),d=im.data,n=W*H,[r,g,bl]=hexRgb(color);for(let i=0;i<n;i++){const on=((b[i>>3]>>(i&7))&1)!==0,j=i*4;d[j]=r;d[j+1]=g;d[j+2]=bl;d[j+3]=on?255:0}x.putImageData(im,0,0)}
-function snapshot(){return{layers:layers.map(l=>({name:l.name,visible:l.visible,color:l.color,role:l.role||'skip',source:l.source||'src',b:packCanvas(l.cv)})),protect:packCanvas(protectCv),active}}
-function restore(s){layers=s.layers.map(o=>{const cv=makeCanvas();unpackCanvas(cv,o.b,o.color||'#ffffff');return{name:o.name,visible:o.visible,color:o.color||'#ffffff',role:o.role||'skip',source:o.source||'src',cv}});unpackCanvas(protectCv,s.protect,'#43e89b');protectCtx=protectCv.getContext('2d',{willReadFrequently:true});active=Math.min(s.active,layers.length-1);refreshLayerUI();draw()}
-function snap(){if(!srcCv)return;undoS.push(snapshot());if(undoS.length>18)undoS.shift();redoS.length=0;buttons()}
-function buttons(){$('#undo').disabled=!undoS.length;$('#redo').disabled=!redoS.length}
-$('#undo').onclick=()=>{if(!undoS.length)return;redoS.push(snapshot());restore(undoS.pop());buttons()};
-$('#redo').onclick=()=>{if(!redoS.length)return;undoS.push(snapshot());restore(redoS.pop());buttons()};
-
-function setPaintStyle(c,which){
-  c.lineWidth=brush;c.lineCap='round';c.lineJoin='round';
-  if(which==='erase'||which==='unprotect'){c.globalCompositeOperation='destination-out';c.strokeStyle=c.fillStyle='rgba(0,0,0,1)'}
-  else{c.globalCompositeOperation='source-over';c.strokeStyle=c.fillStyle=(which==='protect'?'#43e89b':activeLayer().color)}
-}
-function applyExclusiveStroke(drawFn){if(!$('#exclusive').checked||mode!=='add')return;for(let i=0;i<layers.length;i++){if(i===active)continue;const c=ctxOf(i);c.save();c.globalCompositeOperation='destination-out';c.strokeStyle=c.fillStyle='rgba(0,0,0,1)';drawFn(c);c.restore()}}
-function targetCtx(){if(mode==='protect'||mode==='unprotect')return protectCtx;return activeCtx()}
-function stroke(a,b){const c=targetCtx();if(!c)return;c.save();setPaintStyle(c,mode);c.beginPath();if(b){c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke()}else{c.arc(a.x,a.y,brush/2,0,Math.PI*2);c.fill()}c.restore();if(mode==='add'){applyExclusiveStroke(x=>{x.lineWidth=brush;x.lineCap='round';x.lineJoin='round';x.beginPath();if(b){x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke()}else{x.beginPath();x.arc(a.x,a.y,brush/2,0,Math.PI*2);x.fill()}})}}
-function fillPath(points){if(points.length<3)return;const c=targetCtx();c.save();setPaintStyle(c,mode);c.beginPath();c.moveTo(points[0].x,points[0].y);for(let i=1;i<points.length;i++)c.lineTo(points[i].x,points[i].y);c.closePath();c.fill();c.restore();if(mode==='add'){applyExclusiveStroke(x=>{x.beginPath();x.moveTo(points[0].x,points[0].y);for(let i=1;i<points.length;i++)x.lineTo(points[i].x,points[i].y);x.closePath();x.fill()})}}
-function snapLine(a,b){const dx=b.x-a.x,dy=b.y-a.y;if(Math.abs(dy)<Math.abs(dx)*.18)return{x:b.x,y:a.y};if(Math.abs(dx)<Math.abs(dy)*.18)return{x:a.x,y:b.y};return b}
-
-function drawMaskOverlay(cv,color,alpha=.38){vctx.globalAlpha=alpha;vctx.drawImage(cv,0,0);vctx.globalAlpha=1}
-function sourceCanvasForLayer(i){const l=layers[i];if(!l)return srcCv;return (l.source==='aux'&&auxCv)?auxCv:srcCv}
-function drawActiveExtract(){const l=activeLayer();if(!l)return;const tmp=makeCanvas(),tc=tmp.getContext('2d');tc.drawImage(sourceCanvasForLayer(active),0,0);tc.globalCompositeOperation='destination-in';tc.drawImage(l.cv,0,0);vctx.drawImage(tmp,0,0)}
-function buildDiagnostics(){const out=makeCanvas(),o=out.getContext('2d'),im=o.createImageData(W,H),d=im.data;const maps=layers.map(l=>l.visible?l.cv.getContext('2d').getImageData(0,0,W,H).data:null);for(let p=0;p<W*H;p++){let n=0;for(const m of maps)if(m&&m[p*4+3]>127)n++;const j=p*4;if(n>1){d[j]=255;d[j+1]=55;d[j+2]=55;d[j+3]=220}else if(n===0){d[j]=65;d[j+1]=150;d[j+2]=255;d[j+3]=120}}o.putImageData(im,0,0);return out}
-function adjustedAI(){if(!aiProb)return null;if(!aiDirty&&aiAdjusted)return aiAdjusted;const th=+$('#aiTh').value*2.55,grow=+$('#edgeGrow').value;let a=new Uint8Array(W*H);for(let i=0;i<a.length;i++)a[i]=aiProb[i]>=th?1:0;if(grow!==0){const dilate=grow>0,steps=Math.abs(grow);for(let s=0;s<steps;s++){const b=new Uint8Array(a.length);for(let y=0;y<H;y++){const row=y*W;for(let x=0;x<W;x++){const p=row+x,v=a[p];if(dilate){let q=v;if(!q&&x>0)q|=a[p-1];if(!q&&x<W-1)q|=a[p+1];if(!q&&y>0)q|=a[p-W];if(!q&&y<H-1)q|=a[p+W];b[p]=q}else{let q=v;if(q&&x>0)q&=a[p-1];else if(q&&x===0)q=0;if(q&&x<W-1)q&=a[p+1];else if(q&&x===W-1)q=0;if(q&&y>0)q&=a[p-W];else if(q&&y===0)q=0;if(q&&y<H-1)q&=a[p+W];else if(q&&y===H-1)q=0;b[p]=q}}}a=b}}
-aiAdjusted=a;aiDirty=false;return a}
-function drawAIPreview(){if(!aiProb||!$('#aiPreview').checked)return;const a=adjustedAI(),tmp=makeCanvas(),c=tmp.getContext('2d'),im=c.createImageData(W,H),d=im.data;for(let i=0;i<a.length;i++)if(a[i]){const j=i*4;d[j]=255;d[j+1]=183;d[j+2]=55;d[j+3]=105}c.putImageData(im,0,0);vctx.drawImage(tmp,0,0)}
-function draw(){vctx.setTransform(1,0,0,1,0,0);vctx.clearRect(0,0,view.width,view.height);const d=Math.min(devicePixelRatio||1,2);vctx.setTransform(d,0,0,d,0,0);if(!srcCv)return;vctx.imageSmoothingEnabled=scale<1;vctx.save();vctx.translate(ox,oy);vctx.scale(scale,scale);
-  if(viewMode===0){vctx.drawImage(srcCv,0,0);layers.forEach((l,i)=>{if(l.visible)drawMaskOverlay(l.cv,layerColor(i),i===active?.42:.24)});drawAIPreview()}
-  else if(viewMode===1){drawActiveExtract();drawAIPreview()}
-  else if(viewMode===2){vctx.fillStyle='#000';vctx.fillRect(0,0,W,H);if(activeLayer()){vctx.save();vctx.filter='brightness(0) invert(1)';vctx.drawImage(activeLayer().cv,0,0);vctx.restore();}}
-  else if(viewMode===3){vctx.drawImage(finalMaskCanvas(),0,0)}
-  else if(viewMode===4){vctx.drawImage(srcCv,0,0);vctx.globalAlpha=.8;vctx.drawImage(buildDiagnostics(),0,0);vctx.globalAlpha=1}
-  if(protectCv){drawMaskOverlay(protectCv,'#42e89a',mode.startsWith('protect')?.55:.22)}
-  if(line){const b=snapLine(line.a,line.b);vctx.globalAlpha=.8;vctx.strokeStyle=mode==='erase'||mode==='unprotect'?'#111':mode.startsWith('protect')?'#43e89b':'#fff';vctx.lineWidth=brush;vctx.lineCap='round';vctx.beginPath();vctx.moveTo(line.a.x,line.a.y);vctx.lineTo(b.x,b.y);vctx.stroke();vctx.globalAlpha=1;vctx.strokeStyle=varColor();vctx.lineWidth=1.5/scale;vctx.setLineDash([7/scale,5/scale]);vctx.beginPath();vctx.moveTo(line.a.x,line.a.y);vctx.lineTo(b.x,b.y);vctx.stroke();vctx.setLineDash([])}
-  if(lasso.length>1){vctx.strokeStyle=varColor();vctx.lineWidth=2/scale;vctx.setLineDash([8/scale,6/scale]);vctx.beginPath();vctx.moveTo(lasso[0].x,lasso[0].y);for(let i=1;i<lasso.length;i++)vctx.lineTo(lasso[i].x,lasso[i].y);vctx.closePath();vctx.stroke();vctx.setLineDash([])}
-  vctx.restore();hud.style.display='block';hud.textContent=`${Math.round(scale*100)}%  |  ${activeLayer()?.name||'—'}`}
-function varColor(){return mode.startsWith('protect')?'#43e89b':'#f0aa42'}
-
-function wand(px,py){px=Math.round(px);py=Math.round(py);if(px<0||py<0||px>=W||py>=H)return;snap();const i0=(py*W+px)*4,r0=sdata[i0],g0=sdata[i0+1],b0=sdata[i0+2],lim=tol*tol*3;const seen=new Uint8Array(W*H),st=[py*W+px],hit=[];seen[py*W+px]=1;while(st.length){const p=st.pop();hit.push(p);const x=p%W,y=(p/W)|0;const nb=[x>0?p-1:-1,x<W-1?p+1:-1,y>0?p-W:-1,y<H-1?p+W:-1];for(const n of nb){if(n<0||seen[n])continue;const j=n*4,dr=sdata[j]-r0,dg=sdata[j+1]-g0,db=sdata[j+2]-b0;if(dr*dr+dg*dg+db*db<=lim){seen[n]=1;st.push(n)}}}
-  applyHit(hit);draw();toast(`${hit.length.toLocaleString()} px`)}
-function applyHit(hit){const c=targetCtx(),im=c.getImageData(0,0,W,H),d=im.data,prot=protectCtx?.getImageData(0,0,W,H).data;let rgb=[255,255,255];if(mode==='add')rgb=hexRgb(activeLayer().color);else if(mode==='protect')rgb=hexRgb('#43e89b');for(const p of hit){if((mode==='add'||mode==='erase')&&prot&&prot[p*4+3]>127)continue;const j=p*4;if(mode==='erase'||mode==='unprotect'){d[j+3]=0}else{d[j]=rgb[0];d[j+1]=rgb[1];d[j+2]=rgb[2];d[j+3]=255}}c.putImageData(im,0,0);if(mode==='add'&&$('#exclusive').checked){for(let i=0;i<layers.length;i++){if(i===active)continue;const x=ctxOf(i),mi=x.getImageData(0,0,W,H),md=mi.data;for(const p of hit){if(prot&&prot[p*4+3]>127)continue;md[p*4+3]=0}x.putImageData(mi,0,0)}}}
-
-function seedAI(px,py){px=Math.round(px);py=Math.round(py);if(!aiProb){alert('先にAI解析してください');return}if(px<0||py<0||px>=W||py>=H)return;const a=adjustedAI(),start=py*W+px;if(!a[start]){toast('ここはAI候補外です');return}snap();const seen=new Uint8Array(W*H),st=[start],hit=[];seen[start]=1;while(st.length){const p=st.pop();hit.push(p);const x=p%W,y=(p/W)|0,nb=[x>0?p-1:-1,x<W-1?p+1:-1,y>0?p-W:-1,y<H-1?p+W:-1];for(const n of nb){if(n>=0&&!seen[n]&&a[n]){seen[n]=1;st.push(n)}}}applyHit(hit);draw();toast(`AI連結領域 ${hit.length.toLocaleString()} px`)}
-
-stage.addEventListener('pointerdown',e=>{if(!srcCv)return;stage.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pts.size===2){painting=false;lasso=[];line=null;const v=[...pts.values()],a=v[0],b=v[1];gest={d:Math.hypot(a.x-b.x,a.y-b.y),cx:(a.x+b.x)/2,cy:(a.y+b.y)/2,s:scale,ox,oy};draw();return}const now=Date.now();if(now-lastTap<280){zoomAt(scale<1.8?3:1/(scale/(Math.min(stage.clientWidth/W,stage.clientHeight/H)*.95)),e.clientX,e.clientY);lastTap=0;return}lastTap=now;if(tool==='pan'){gest={pan:true,x:e.clientX,y:e.clientY,ox,oy};return}const p=toImg(e.clientX,e.clientY);if(tool==='wand'){wand(p.x,p.y);return}if(tool==='seed'){seedAI(p.x,p.y);return}if(tool==='line'){painting=true;line={a:p,b:p};draw();return}snap();painting=true;last=p;if(tool==='lasso')lasso=[p];else stroke(p);draw()});
-stage.addEventListener('pointermove',e=>{if(!srcCv)return;if(pts.has(e.pointerId))pts.set(e.pointerId,{x:e.clientX,y:e.clientY});if(gest&&gest.pan&&pts.size===1){ox=gest.ox+e.clientX-gest.x;oy=gest.oy+e.clientY-gest.y;draw();return}if(pts.size===2&&gest&&!gest.pan){const v=[...pts.values()],a=v[0],b=v[1],dd=Math.hypot(a.x-b.x,a.y-b.y),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,r=stage.getBoundingClientRect();scale=Math.max(.05,Math.min(30,gest.s*(dd/gest.d)));ox=cx-r.left-(gest.cx-r.left-gest.ox)*(scale/gest.s);oy=cy-r.top-(gest.cy-r.top-gest.oy)*(scale/gest.s);draw();return}if((tool==='brush'||tool==='line')&&!painting){const r=stage.getBoundingClientRect();dot.style.display='block';dot.style.left=(e.clientX-r.left)+'px';dot.style.top=(e.clientY-r.top)+'px';dot.style.width=dot.style.height=(brush*scale)+'px'}if(!painting)return;const p=toImg(e.clientX,e.clientY);if(tool==='line'){line.b=p;draw()}else if(tool==='lasso'){lasso.push(p);draw()}else{stroke(last,p);last=p;draw()}});
-function pointerUp(e){pts.delete(e.pointerId);if(pts.size===0){if(painting&&tool==='lasso'){fillPath(lasso);lasso=[]}if(painting&&tool==='line'&&line){const b=snapLine(line.a,line.b);if(Math.hypot(b.x-line.a.x,b.y-line.a.y)>1){snap();stroke(line.a,b)}line=null}painting=false;gest=null;draw()}}
-stage.addEventListener('pointerup',pointerUp);stage.addEventListener('pointercancel',pointerUp);stage.addEventListener('pointerleave',()=>dot.style.display='none');stage.addEventListener('wheel',e=>{if(!srcCv)return;e.preventDefault();zoomAt(e.deltaY<0?1.15:1/1.15,e.clientX,e.clientY)},{passive:false});
-
-$$('#paintMode button').forEach(b=>b.onclick=()=>{$$('#paintMode button').forEach(x=>x.classList.remove('on'));b.classList.add('on');mode=b.dataset.mode;draw()});
-$$('[data-tool]').forEach(b=>b.onclick=()=>{$$('[data-tool]').forEach(x=>x.classList.remove('on'));b.classList.add('on');tool=b.dataset.tool;lasso=[];line=null;dot.style.display='none';$('#sizeWrap').hidden=!(tool==='brush'||tool==='line');$('#tolWrap').hidden=tool!=='wand';draw()});
-$('#size').oninput=e=>{brush=+e.target.value;$('#sizeV').textContent=brush};$('#tol').oninput=e=>{tol=+e.target.value;$('#tolV').textContent=tol};
-$('#fit').onclick=fit;$('#zoomIn').onclick=()=>zoomAt(1.35);$('#zoomOut').onclick=()=>zoomAt(1/1.35);
-$('#viewMode').onclick=()=>{viewMode=(viewMode+1)%5;$('#viewMode').textContent=['色分け','選択だけ','選択マスク','最終マスク','重複確認'][viewMode];draw()};
-
-function roleLabel(role){return role==='black'?'黒':role==='white'?'白':'出力なし'}
-function sourceLabel(src){return src==='aux'?'別画像':'原版'}
-function refreshLayerUI(){const list=$('#layerList');list.innerHTML='';layers.forEach((l,i)=>{const row=document.createElement('div');row.className='layerRow'+(i===active?' active':'');row.innerHTML=`<button class="eye">${l.visible?'👁':'—'}</button><div><div class="layerName"><span class="swatch" style="background:${layerColor(i)}"></span>${escapeHtml(l.name)}</div><div class="layerMeta">${i===0?'最前面':i===layers.length-1?'最背面':'レイヤー '+(i+1)} ・ 出力:${roleLabel(l.role||'skip')} ・ 素材:${sourceLabel(l.source||'src')}</div></div><select class="roleSel"><option value="black">黒</option><option value="white">白</option><option value="skip">なし</option></select><button class="mini up">↑</button><button class="mini down">↓</button><button class="mini sel">選択</button>`;row.querySelector('.roleSel').value=l.role||'skip';row.querySelector('.roleSel').onchange=e=>{l.role=e.target.value;refreshLayerUI();draw()};row.querySelector('.eye').onclick=e=>{e.stopPropagation();l.visible=!l.visible;refreshLayerUI();draw()};row.querySelector('.sel').onclick=()=>{active=i;refreshLayerUI();draw()};row.querySelector('.up').onclick=()=>{if(i===0)return;snap();[layers[i-1],layers[i]]=[layers[i],layers[i-1]];active=i-1;refreshLayerUI();draw()};row.querySelector('.down').onclick=()=>{if(i===layers.length-1)return;snap();[layers[i+1],layers[i]]=[layers[i],layers[i+1]];active=i+1;refreshLayerUI();draw()};row.onclick=()=>{active=i;refreshLayerUI();draw()};list.appendChild(row)});$('#activeLabel').textContent=`${activeLayer()?.name||'—'} / 出力:${roleLabel(activeLayer()?.role||'skip')} / 素材:${sourceLabel(activeLayer()?.source||'src')}`;}
-function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-$('#addLayer').onclick=()=>{if(!srcCv)return;const name=prompt('レイヤー名','新規レイヤー');if(!name)return;snap();layers.splice(active,0,{name,cv:makeCanvas(),visible:true,color:newLayerColor(layers.length+3),role:'skip',source:'src'});active=Math.max(0,active);refreshLayerUI();draw()};
-$('#renameLayer').onclick=()=>{if(!activeLayer())return;const n=prompt('新しい名前',activeLayer().name);if(!n)return;activeLayer().name=n;refreshLayerUI();draw()};
-$('#deleteLayer').onclick=()=>{if(layers.length<=1){alert('最後の1枚は削除できません');return}if(!confirm(`「${activeLayer().name}」を削除しますか？`))return;snap();layers.splice(active,1);active=Math.min(active,layers.length-1);refreshLayerUI();draw()};
-$('#clearProtect').onclick=()=>{if(!protectCv)return;snap();clearCanvas(protectCv);draw();toast('保護を消去しました')};
-
-function showSheet(id){$(id).classList.add('on')}function hideSheets(){$$('.sheet').forEach(s=>s.classList.remove('on'))}
-$('#assetBtn').onclick=()=>showSheet('#assetSheet');$('#layersBtn').onclick=()=>{refreshLayerUI();showSheet('#layersSheet')};$('#aiBtn').onclick=()=>showSheet('#aiSheet');$('#exportBtn').onclick=()=>{refreshExportPreview('composite');showSheet('#exportSheet')};$$('.closeSheet').forEach(b=>b.onclick=hideSheets);$$('.sheet').forEach(s=>s.addEventListener('click',e=>{if(e.target===s)hideSheets()}));
-
-async function aiLoad(key){if(!aiLib){$('#aiMsg').textContent='ライブラリ取得中…';aiLib=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3');aiLib.env.allowLocalModels=false}if(aiModel&&aiName===key)return;$('#aiMsg').textContent='モデル取得中…（初回のみ）';const id=AI_MODELS[key];aiModel=await aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'},device:'webgpu',dtype:'fp32'}).catch(()=>aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'}}));aiProc=await aiLib.AutoProcessor.from_pretrained(id,{config:{do_normalize:true,do_pad:false,do_rescale:true,do_resize:true,image_mean:[.5,.5,.5],image_std:[1,1,1],feature_extractor_type:'ImageFeatureExtractor',resample:2,rescale_factor:.00392156862745098,size:{width:1024,height:1024}}});aiName=key}
-async function aiAnalyze(){if(!srcCv){alert('先に原版を読み込んでください');return}setBusy(true,'AI解析中…');try{await aiLoad($('#aiModel').value);$('#aiMsg').textContent='解析中…';const flat=makeCanvas(),fc=flat.getContext('2d');fc.fillStyle='#fff';fc.fillRect(0,0,W,H);fc.drawImage(srcCv,0,0);const raw=await aiLib.RawImage.fromURL(flat.toDataURL('image/png'));const {pixel_values}=await aiProc(raw);const out=await aiModel({input:pixel_values});const t=out.output||out.alphas||Object.values(out)[0];const m=await aiLib.RawImage.fromTensor(t[0].mul(255).to('uint8')).resize(W,H);let arr=m.data;if(arr.length!==W*H){const ch=Math.round(arr.length/(W*H));const g=new Uint8Array(W*H);for(let i=0;i<g.length;i++)g[i]=arr[i*ch];arr=g}let mn=255,mx=0;for(const v of arr){if(v<mn)mn=v;if(v>mx)mx=v}aiProb=new Uint8Array(W*H);const den=Math.max(1,mx-mn);for(let i=0;i<aiProb.length;i++)aiProb[i]=Math.max(0,Math.min(255,Math.round((arr[i]-mn)*255/den)));aiDirty=true;aiAdjusted=null;$('#aiMsg').textContent='解析完了。感度・境界を調整できます';draw()}catch(e){console.error(e);$('#aiMsg').textContent='AI解析に失敗しました';alert('AI解析に失敗しました。通信環境、WebGPU対応、モデル読み込みを確認してください。')}finally{setBusy(false)}}
-$('#runAI').onclick=aiAnalyze;$('#aiTh').oninput=e=>{$('#aiThV').textContent=e.target.value;aiDirty=true;draw()};$('#edgeGrow').oninput=e=>{$('#edgeGrowV').textContent=e.target.value;aiDirty=true;draw()};$('#aiPreview').onchange=draw;
-function applyAIMaskTo(index,invert=false){if(!aiProb){alert('先にAI解析してください');return}const a=adjustedAI(),c=ctxOf(index),im=c.createImageData(W,H),d=im.data,prot=protectCtx.getImageData(0,0,W,H).data,old=c.getImageData(0,0,W,H).data,[r,g,b]=hexRgb(layers[index].color);for(let i=0;i<W*H;i++){const j=i*4;if(prot[j+3]>127){d[j]=old[j];d[j+1]=old[j+1];d[j+2]=old[j+2];d[j+3]=old[j+3];continue}let on=!!a[i];if(invert)on=!on;d[j]=r;d[j+1]=g;d[j+2]=b;d[j+3]=on?255:0}c.putImageData(im,0,0)}
-
-$('#alphaToLayer').onclick=()=>{if(!srcCv)return; activeLayer().source='src';let transparent=0;for(let i=0;i<W*H;i++)if(sdata[i*4+3]<250)transparent++;if(transparent<W*H*.001){alert('この画像には有効な透明部分がほぼありません。AI解析を使ってください。');return}snap();const c=activeCtx(),im=c.createImageData(W,H),d=im.data,[r,g,b]=hexRgb(activeLayer().color),prot=protectCtx.getImageData(0,0,W,H).data,old=c.getImageData(0,0,W,H).data;for(let i=0;i<W*H;i++){const j=i*4;if(prot[j+3]>127){d[j]=old[j];d[j+1]=old[j+1];d[j+2]=old[j+2];d[j+3]=old[j+3];continue}d[j]=r;d[j+1]=g;d[j+2]=b;d[j+3]=sdata[j+3]>=128?255:0}c.putImageData(im,0,0);draw();toast('元画像の透明度を適用しました')};
-$('#applyAI').onclick=()=>{if(!aiProb){aiAnalyze();return}snap();activeLayer().source='src';applyAIMaskTo(active,false);if($('#exclusive').checked){const a=adjustedAI(),prot=protectCtx.getImageData(0,0,W,H).data;for(let k=0;k<layers.length;k++){if(k===active)continue;const c=ctxOf(k),im=c.getImageData(0,0,W,H),d=im.data;for(let i=0;i<W*H;i++)if(a[i]&&prot[i*4+3]<128){const j=i*4;d[j+3]=0}c.putImageData(im,0,0)}}draw();toast(`AI候補 → ${activeLayer().name}`)};
-$('#makeBg').onclick=()=>{if(!aiProb){alert('先にAI解析してください');return}let idx=layers.findIndex(l=>l.name==='背景');if(idx<0){layers.push({name:'背景',cv:makeCanvas(),visible:true,color:'#b77cff',role:'white',source:'src'});idx=layers.length-1}snap();layers[idx].source='src';applyAIMaskTo(idx,true);refreshLayerUI();draw();toast('背景レイヤーを作成しました')};
-
-function buildMaskFromRGBA(data,w,h,mode='auto',thr=8){
-  const n=w*h,out=new Uint8Array(n);
-  let transparent=0;
-  for(let i=0;i<n;i++) if(data[i*4+3]<250) transparent++;
-  if(mode==='alpha'||(mode==='auto'&&transparent>n*0.001)){
-    for(let i=0;i<n;i++) out[i]=data[i*4+3]>=128?1:0;
-    return out;
-  }
-  const cand=new Uint8Array(n),bg=new Uint8Array(n),st=[];
-  for(let i=0;i<n;i++){const j=i*4,a=data[j+3],m=Math.max(data[j],data[j+1],data[j+2]); cand[i]=(a>=8&&m<=thr)?1:0;}
-  function push(p){if(p<0||p>=n||bg[p]||!cand[p])return; bg[p]=1; st.push(p)}
-  for(let x=0;x<w;x++){push(x); push((h-1)*w+x)}
-  for(let y=1;y<h-1;y++){push(y*w); push(y*w+(w-1))}
-  while(st.length){const p=st.pop(),x=p%w,y=(p/w)|0; if(x>0)push(p-1); if(x<w-1)push(p+1); if(y>0)push(p-w); if(y<h-1)push(p+w)}
-  for(let i=0;i<n;i++){const a=data[i*4+3]; out[i]=(!bg[i]&&a>=8)?1:0}
-  return out;
-}
-function applyBinaryToActive(arr,clearFirst=true,label='取り込み完了'){
-  if(!srcCv||!activeLayer()) return;
-  snap();
-  const c=activeCtx(),im=c.getImageData(0,0,W,H),d=im.data,prot=protectCtx.getImageData(0,0,W,H).data,[r,g,b]=hexRgb(activeLayer().color);
-  if(clearFirst){for(let i=0;i<d.length;i+=4){d[i]=d[i+1]=d[i+2]=0; d[i+3]=0;}}
-  for(let i=0;i<W*H;i++){ if(!arr[i]) continue; const j=i*4; if(prot[j+3]>127) continue; d[j]=r; d[j+1]=g; d[j+2]=b; d[j+3]=255; }
-  c.putImageData(im,0,0);
-  if($('#exclusive').checked){
-    for(let k=0;k<layers.length;k++){ if(k===active) continue; const x=ctxOf(k),mi=x.getImageData(0,0,W,H),md=mi.data; let changed=false;
-      for(let i=0;i<W*H;i++){ if(!arr[i]) continue; const j=i*4; if(prot[j+3]>127) continue; if(md[j+3]){md[j+3]=0; changed=true;}}
-      if(changed) x.putImageData(mi,0,0);
-    }
-  }
-  draw(); toast(label);
-}
-$('#matThr').oninput=e=>$('#matThrV').textContent=e.target.value;
-$('#srcToLayer').onclick=()=>{ if(!srcCv){alert('先に原版を読み込んでください');return} activeLayer().source='src'; const arr=buildMaskFromRGBA(sdata,W,H,'blackbg',+$('#matThr').value); applyBinaryToActive(arr,$('#matClear').checked,'原版 → '+(activeLayer()?.name||'現在レイヤー')); refreshLayerUI(); };
-$('#openAux').onclick=()=>$('#fAux').click();
-$('#fAux').onchange=e=>{const f=e.target.files[0]; if(!f) return; const im=new Image(); im.onload=()=>{ if(!srcCv){alert('先に原版を読み込んでください'); return } auxCv=makeCanvas(); const tmp=makeCanvas(),tc=tmp.getContext('2d',{willReadFrequently:true}),ac=auxCv.getContext('2d',{willReadFrequently:true}); tc.clearRect(0,0,W,H); ac.clearRect(0,0,W,H); tc.drawImage(im,0,0,W,H); ac.drawImage(im,0,0,W,H); auxData=tc.getImageData(0,0,W,H).data; auxLoadedName=f.name; $('#auxName').textContent='選択中: '+f.name+' ('+im.naturalWidth+'×'+im.naturalHeight+')'; showSheet('#assetSheet'); toast('別画像を読み込みました'); }; im.src=URL.createObjectURL(f); e.target.value='';};
-$('#auxToLayer').onclick=()=>{ if(!srcCv){alert('先に原版を読み込んでください');return} if(!auxData){alert('先に別画像を選んでください');return} activeLayer().source='aux'; const arr=buildMaskFromRGBA(auxData,W,H,$('#auxMode').value,+$('#matThr').value); applyBinaryToActive(arr,$('#matClear').checked,'別画像 → '+(activeLayer()?.name||'現在レイヤー')); refreshLayerUI(); };
-function transparentLayerCanvas(i){const out=makeCanvas(),c=out.getContext('2d');c.drawImage(sourceCanvasForLayer(i),0,0);c.globalCompositeOperation='destination-in';c.drawImage(layers[i].cv,0,0);return out}
-function compositeIllustrationCanvas(){const out=makeCanvas(),c=out.getContext('2d');for(let i=layers.length-1;i>=0;i--){if(!layers[i].visible)continue;const part=transparentLayerCanvas(i);c.drawImage(part,0,0)}return out}
-function finalMaskCanvas(){const out=makeCanvas(),c=out.getContext('2d'),md=c.createImageData(W,H),d=md.data;const maps=layers.map(l=>l.cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data);for(let i=0;i<W*H;i++){let isBlack=false;for(let k=0;k<layers.length;k++){const l=layers[k];if(!l.visible)continue;const a=maps[k][i*4+3]>127;if(!a)continue;const role=l.role||'skip';if(role==='black'){isBlack=true;break}}const j=i*4;const v=isBlack?0:255;d[j]=d[j+1]=d[j+2]=v;d[j+3]=255;}c.putImageData(md,0,0);return out}
-function refreshExportPreview(kind='composite'){$('#exportPreview').src=(kind==='black'?finalMaskCanvas():compositeIllustrationCanvas()).toDataURL('image/png');}
-function downloadCanvas(c,name){c.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000)},'image/png')}
-$('#prevComposite').onclick=()=>{if(!srcCv)return;refreshExportPreview('composite')};
-$('#prevBlack').onclick=()=>{if(!srcCv)return;refreshExportPreview('black')};
-$('#expComposite').onclick=()=>{if(!srcCv)return;downloadCanvas(compositeIllustrationCanvas(),'completed_illustration.png')};
-$('#expBlack').onclick=()=>{if(!srcCv)return;downloadCanvas(finalMaskCanvas(),'black_fill_mask.png')};
-function maskCanvasFromCanvas(cv){const out=makeCanvas(),c=out.getContext('2d'),src=cv.getContext('2d').getImageData(0,0,W,H).data,md=c.createImageData(W,H),d=md.data;for(let p=0;p<d.length;p+=4){const v=src[p+3]>127?255:0;d[p]=d[p+1]=d[p+2]=v;d[p+3]=255}c.putImageData(md,0,0);return out}
-
-$('#openSrc').onclick=()=>$('#fSrc').click();$('#fSrc').onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{W=im.naturalWidth;H=im.naturalHeight;srcCv=makeCanvas();srcCv.getContext('2d',{willReadFrequently:true}).drawImage(im,0,0);sdata=srcCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;protectCv=makeCanvas();protectCtx=protectCv.getContext('2d',{willReadFrequently:true});clearCanvas(protectCv);auxData=null;auxLoadedName='';auxCv=null;$('#auxName').textContent='別画像が未選択です';defaultLayers();layers.forEach(l=>clearCanvas(l.cv));aiProb=null;aiAdjusted=null;aiDirty=true;undoS.length=0;redoS.length=0;buttons();$('#empty').style.display='none';refreshLayerUI();fit();toast(`${W}×${H} 読み込み完了`)};im.src=URL.createObjectURL(f);e.target.value=''};
-
-addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(()=>{resize();if(srcCv)fit()},120));if(window.ResizeObserver){let rt=null,lastW=0,lastH=0;new ResizeObserver(()=>{clearTimeout(rt);rt=setTimeout(()=>{const r=stage.getBoundingClientRect();if(Math.abs(r.width-lastW)<1&&Math.abs(r.height-lastH)<1)return;const first=lastW===0;lastW=r.width;lastH=r.height;resize();if(first&&srcCv)fit()},60)}).observe(stage)}
-resize();refreshLayerUI();
+const stage=$('#stage'),cv=$('#cv'),ctx=cv.getContext('2d'),dot=$('#dot'),hud=$('#hud');
+let bodyImg=null,fxImg=null,W=0,H=0,bodyCv=null,fxCv=null,bodyMask=null,fxMask=null,split=null;
+let scale=1,ox=0,oy=0,target='body',bodyMode='add',fxMode='back',brush=70,viewMode=0,painting=false,last=null;
+let fxX=0,fxY=0,fxS=1,fxBaseScale=1;const pts=new Map();let gest=null;
+let aiLib=null,aiModel=null,aiProc=null,aiProb=null; const AI_ID='briaai/RMBG-1.4';
+const history=[];
+function setBusy(on,msg=''){ $('#busy').classList.toggle('on',!!on); $('#busyText').textContent=msg||'処理中…'; }
+function mkcv(){const c=document.createElement('canvas');c.width=W;c.height=H;return c}
+function cloneU8(a){return a?new Uint8Array(a):null}
+function pushHistory(){history.push({bodyMask:cloneU8(bodyMask),split:cloneU8(split),fxMask:cloneU8(fxMask),fxX,fxY,fxS}); if(history.length>30)history.shift(); $('#undo').disabled=!history.length}
+function undo(){const s=history.pop(); if(!s)return; bodyMask=s.bodyMask; split=s.split; fxMask=s.fxMask; fxX=s.fxX; fxY=s.fxY; fxS=s.fxS; $('#fxX').value=fxX; $('#fxY').value=fxY; $('#fxScale').value=Math.round(fxS*100); $('#fxXV').textContent=fxX; $('#fxYV').textContent=fxY; $('#fxScaleV').textContent=Math.round(fxS*100); syncFxCanvas(false); draw(); $('#undo').disabled=!history.length}
+function resize(){const r=stage.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);cv.width=r.width*d;cv.height=r.height*d;cv.style.width=r.width+'px';cv.style.height=r.height+'px';draw()}
+function fit(){if(!W)return;const r=stage.getBoundingClientRect();scale=Math.min(r.width/W,r.height/H)*.95;ox=(r.width-W*scale)/2;oy=(r.height-H*scale)/2;draw()}
+function toImg(x,y){const r=stage.getBoundingClientRect();return{x:(x-r.left-ox)/scale,y:(y-r.top-oy)/scale}}
+function loadIntoCanvas(im){const c=mkcv(),x=c.getContext('2d',{willReadFrequently:true});x.clearRect(0,0,W,H);x.drawImage(im,0,0,W,H);return c}
+function hasUsefulAlpha(srcCv){const d=srcCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;let t=0;for(let i=0;i<W*H;i++) if(d[i*4+3]<250)t++; return t>W*H*0.001}
+function applyAlphaBody(){ if(!bodyCv) return; pushHistory(); const d=bodyCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data; bodyMask=new Uint8Array(W*H); for(let i=0;i<W*H;i++) bodyMask[i]=d[i*4+3]>=128?1:0; draw(); }
+function floodBodyMask(){ if(!bodyCv) return; const d=bodyCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data,n=W*H,thr=+$('#bodyThr').value; const cand=new Uint8Array(n),bg=new Uint8Array(n),st=[]; for(let i=0;i<n;i++){const j=i*4,m=Math.max(d[j],d[j+1],d[j+2]); cand[i]=(d[j+3]>8&&m<=thr)?1:0;} function push(p){ if(p<0||p>=n||bg[p]||!cand[p]) return; bg[p]=1; st.push(p);} for(let x=0;x<W;x++){push(x);push((H-1)*W+x)} for(let y=1;y<H-1;y++){push(y*W);push(y*W+W-1)} while(st.length){const p=st.pop(),x=p%W,y=(p/W)|0; if(x>0)push(p-1); if(x<W-1)push(p+1); if(y>0)push(p-W); if(y<H-1)push(p+W)} bodyMask=new Uint8Array(n); for(let i=0;i<n;i++) bodyMask[i]=(!bg[i]&&d[i*4+3]>8)?1:0; draw(); }
+function applyAIBody(){ if(!aiProb) return; const thr=+$('#aiThr').value; bodyMask=new Uint8Array(W*H); for(let i=0;i<W*H;i++) bodyMask[i]=aiProb[i]>=thr?1:0; draw(); }
+async function ensureAI(){ if(aiLib&&aiModel&&aiProc) return; $('#aiMsg').textContent='AIライブラリを取得中…'; aiLib=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3'); aiLib.env.allowLocalModels=false; $('#aiMsg').textContent='AIモデルを取得中…（初回のみ時間がかかります）'; aiModel=await aiLib.AutoModel.from_pretrained(AI_ID,{config:{model_type:'custom'},device:'webgpu',dtype:'fp32'}).catch(()=>aiLib.AutoModel.from_pretrained(AI_ID,{config:{model_type:'custom'}})); aiProc=await aiLib.AutoProcessor.from_pretrained(AI_ID,{config:{do_normalize:true,do_pad:false,do_rescale:true,do_resize:true,image_mean:[.5,.5,.5],image_std:[1,1,1],feature_extractor_type:'ImageFeatureExtractor',resample:2,rescale_factor:.00392156862745098,size:{width:1024,height:1024}}}); }
+async function runAI(){ if(!bodyCv){alert('先に本体画像を読み込んでください');return;} setBusy(true,'AIで本体を判別中…'); try{ await ensureAI(); const flat=mkcv(),fc=flat.getContext('2d'); fc.fillStyle='#fff'; fc.fillRect(0,0,W,H); fc.drawImage(bodyCv,0,0); const raw=await aiLib.RawImage.fromURL(flat.toDataURL('image/png')); const {pixel_values}=await aiProc(raw); const out=await aiModel({input:pixel_values}); const t=out.output||out.alphas||Object.values(out)[0]; const m=await aiLib.RawImage.fromTensor(t[0].mul(255).to('uint8')).resize(W,H); let arr=m.data; if(arr.length!==W*H){ const ch=Math.round(arr.length/(W*H)); const g=new Uint8Array(W*H); for(let i=0;i<g.length;i++) g[i]=arr[i*ch]; arr=g; } let mn=255,mx=0; for(const v of arr){if(v<mn)mn=v;if(v>mx)mx=v} aiProb=new Uint8Array(W*H); const den=Math.max(1,mx-mn); for(let i=0;i<aiProb.length;i++) aiProb[i]=Math.max(0,Math.min(255,Math.round((arr[i]-mn)*255/den))); pushHistory(); applyAIBody(); $('#aiMsg').textContent='AI解析完了。AI感度を動かすと本体マスクを再計算します。必要な所だけブラシで修正してください。'; }
+ catch(e){ console.error(e); alert('AI解析に失敗しました。通信状況や端末相性が原因のことがあります。'); $('#aiMsg').textContent='AI解析に失敗しました。透過 / 黒背景抽出を使うか、あとで再試行してください。'; }
+ finally{ setBusy(false); }}
+function transformedFxCanvas(){ if(!fxImg) return null; const c=mkcv(),x=c.getContext('2d'); const w=fxImg.naturalWidth||fxImg.width,h=fxImg.naturalHeight||fxImg.height; x.save(); x.translate(W/2+fxX,H/2+fxY); x.scale(fxBaseScale*fxS,fxBaseScale*fxS); x.drawImage(fxImg,-w/2,-h/2); x.restore(); return c; }
+function rebuildFx(keepSplit=true){ if(!fxCv) return; const d=fxCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data,n=W*H,thr=+$('#fxThr').value; const oldSplit=split?new Uint8Array(split):null; fxMask=new Uint8Array(n); for(let i=0;i<n;i++){ const j=i*4,lum=.299*d[j]+.587*d[j+1]+.114*d[j+2]; fxMask[i]=(d[j+3]>8&&lum>thr)?1:0; }
+  split=new Uint8Array(n);
+  if(keepSplit && oldSplit && oldSplit.length===n){ for(let i=0;i<n;i++) split[i]=fxMask[i]?(oldSplit[i]||1):0; }
+  else { for(let i=0;i<n;i++) split[i]=fxMask[i]?1:0; }
+  draw(); }
+function syncFxCanvas(keepSplit=true){ if(!fxImg) return; fxCv=transformedFxCanvas(); rebuildFx(keepSplit); }
+function bodyLayer(){ const out=mkcv(),o=out.getContext('2d'),s=bodyCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H),d=s.data; for(let i=0;i<W*H;i++){const j=i*4; d[j+3]=bodyMask&&bodyMask[i]?d[j+3]:0} o.putImageData(s,0,0); return out; }
+function softFxLayer(which){ if(!fxCv) return mkcv(); const out=mkcv(),o=out.getContext('2d'),s=fxCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H),d=s.data,thr=+$('#fxThr').value; for(let i=0;i<W*H;i++){ const j=i*4; const lum=.299*d[j]+.587*d[j+1]+.114*d[j+2]; let ok=fxMask&&fxMask[i]; if(which==='front') ok=ok&&split[i]===1; if(which==='back') ok=ok&&split[i]===2; const alpha=ok?Math.max(0,Math.min(1,(lum-thr)/Math.max(12,255-thr))):0; d[j+3]=Math.round(d[j+3]*alpha); } o.putImageData(s,0,0); return out; }
+function artCanvas(){ const out=mkcv(),o=out.getContext('2d'); if(fxCv&&fxMask) o.drawImage(softFxLayer('back'),0,0); if(bodyCv&&bodyMask) o.drawImage(bodyLayer(),0,0); if(fxCv&&fxMask) o.drawImage(softFxLayer('front'),0,0); return out; }
+function maskCanvas(){ const out=mkcv(),o=out.getContext('2d'),im=o.createImageData(W,H),d=im.data; for(let i=0;i<W*H;i++){ const j=i*4; let v=255; if(bodyMask&&bodyMask[i]) v=0; if(fxMask&&split&&fxMask[i]&&split[i]===1) v=255; d[j]=d[j+1]=d[j+2]=v; d[j+3]=255; } o.putImageData(im,0,0); return out; }
+function overlayCanvas(){ const out=mkcv(),o=out.getContext('2d'); if(bodyCv&&bodyMask) o.drawImage(bodyLayer(),0,0); const im=o.getImageData(0,0,W,H),d=im.data; for(let i=0;i<W*H;i++){ const j=i*4; if(bodyMask&&bodyMask[i]){ d[j]=20;d[j+1]=20;d[j+2]=20;d[j+3]=120; } if(split&&split[i]===1){ d[j]=255;d[j+1]=75;d[j+2]=95;d[j+3]=180; } else if(split&&split[i]===2){ d[j]=70;d[j+1]=160;d[j+2]=255;d[j+3]=180; } } o.putImageData(im,0,0); return out; }
+function draw(){ ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height); const dpr=Math.min(devicePixelRatio||1,2); ctx.setTransform(dpr,0,0,dpr,0,0); if(!W){ hud.style.display='none'; return; } ctx.save(); ctx.translate(ox,oy); ctx.scale(scale,scale); const src=viewMode===0?artCanvas():viewMode===1?maskCanvas():overlayCanvas(); ctx.drawImage(src,0,0); ctx.restore(); hud.style.display='block'; hud.textContent=`${Math.round(scale*100)}% / ${target==='body'?'本体編集':'エフェクト編集'} / ${viewMode===0?'完成表示':viewMode===1?'黒塗り表示':'確認表示'}`; }
+function paintBody(p){ if(!bodyMask) bodyMask=new Uint8Array(W*H); const rr=brush/2,x0=Math.max(0,Math.floor(p.x-rr)),x1=Math.min(W-1,Math.ceil(p.x+rr)),y0=Math.max(0,Math.floor(p.y-rr)),y1=Math.min(H-1,Math.ceil(p.y+rr)),r2=rr*rr; for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){ if((x-p.x)**2+(y-p.y)**2>r2) continue; const i=y*W+x; bodyMask[i]=bodyMode==='add'?1:0; } }
+function paintFx(p){ if(!split||!fxMask) return; const rr=brush/2,x0=Math.max(0,Math.floor(p.x-rr)),x1=Math.min(W-1,Math.ceil(p.x+rr)),y0=Math.max(0,Math.floor(p.y-rr)),y1=Math.min(H-1,Math.ceil(p.y+rr)),r2=rr*rr; for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){ if((x-p.x)**2+(y-p.y)**2>r2) continue; const i=y*W+x; if(!fxMask[i]&&fxMode!=='erase') continue; split[i]=fxMode==='front'?1:fxMode==='back'?2:0; } }
+function paintAt(p){ if(target==='body') paintBody(p); else paintFx(p); }
+function linePaint(a,b){ const dist=Math.hypot(b.x-a.x,b.y-a.y),n=Math.max(1,Math.ceil(dist/Math.max(2,brush*.18))); for(let i=0;i<=n;i++) paintAt({x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n}); }
+stage.addEventListener('pointerdown',e=>{ if(!W) return; stage.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(pts.size===2){ painting=false; const v=[...pts.values()],a=v[0],b=v[1]; gest={d:Math.hypot(a.x-b.x,a.y-b.y),cx:(a.x+b.x)/2,cy:(a.y+b.y)/2,s:scale,ox,oy}; return; } pushHistory(); painting=true; last=toImg(e.clientX,e.clientY); paintAt(last); draw(); });
+stage.addEventListener('pointermove',e=>{ if(pts.has(e.pointerId)) pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); if(pts.size===2&&gest){ const v=[...pts.values()],a=v[0],b=v[1],dd=Math.hypot(a.x-b.x,a.y-b.y),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,r=stage.getBoundingClientRect(); scale=Math.max(.05,Math.min(20,gest.s*dd/gest.d)); ox=cx-r.left-(gest.cx-r.left-gest.ox)*scale/gest.s; oy=cy-r.top-(gest.cy-r.top-gest.oy)*scale/gest.s; draw(); return; } const r=stage.getBoundingClientRect(); dot.style.display='block'; dot.style.left=(e.clientX-r.left)+'px'; dot.style.top=(e.clientY-r.top)+'px'; dot.style.width=dot.style.height=(brush*scale)+'px'; if(!painting) return; const p=toImg(e.clientX,e.clientY); linePaint(last,p); last=p; draw(); });
+function up(e){ pts.delete(e.pointerId); if(pts.size===0){ painting=false; gest=null; } } stage.addEventListener('pointerup',up); stage.addEventListener('pointercancel',up); stage.addEventListener('pointerleave',()=>dot.style.display='none');
+$$('#targetBtns .btn').forEach(b=>b.onclick=()=>{ $$('#targetBtns .btn').forEach(x=>x.classList.remove('on')); b.classList.add('on'); target=b.dataset.target; $('#bodyModes').style.display=target==='body'?'flex':'none'; $('#fxModes').style.display=target==='fx'?'flex':'none'; draw(); });
+$$('#bodyModeBtns .btn').forEach(b=>b.onclick=()=>{ $$('#bodyModeBtns .btn').forEach(x=>x.classList.remove('on')); b.classList.add('on'); bodyMode=b.dataset.bmode; });
+$$('#fxModeBtns .btn').forEach(b=>b.onclick=()=>{ $$('#fxModeBtns .btn').forEach(x=>x.classList.remove('on')); b.classList.add('on'); fxMode=b.dataset.fmode; });
+$('#brush').oninput=e=>{ brush=+e.target.value; $('#brushV').textContent=brush; };
+$('#bodyThr').oninput=e=>{ $('#bodyThrV').textContent=e.target.value; };
+$('#aiThr').oninput=e=>{ $('#aiThrV').textContent=e.target.value; if(aiProb){ applyAIBody(); } };
+$('#fxThr').oninput=e=>{ $('#fxThrV').textContent=e.target.value; if(fxCv) rebuildFx(true); };
+$('#fxX').oninput=e=>{ fxX=+e.target.value; $('#fxXV').textContent=fxX; syncFxCanvas(true); };
+$('#fxY').oninput=e=>{ fxY=+e.target.value; $('#fxYV').textContent=fxY; syncFxCanvas(true); };
+$('#fxScale').oninput=e=>{ fxS=+e.target.value/100; $('#fxScaleV').textContent=e.target.value; syncFxCanvas(true); };
+$('#fit').onclick=fit; $('#undo').onclick=undo; $('#undo').disabled=true;
+$('#viewBtn').onclick=()=>{ viewMode=(viewMode+1)%3; $('#viewBtn').textContent=['完成','黒塗り','確認'][viewMode]; draw(); };
+$('#bodyAll').onclick=()=>{ if(!W) return; pushHistory(); bodyMask=new Uint8Array(W*H); bodyMask.fill(1); draw(); };
+$('#resetSplit').onclick=()=>{ if(!fxMask) return; pushHistory(); split=new Uint8Array(W*H); for(let i=0;i<W*H;i++) split[i]=fxMask[i]?1:0; draw(); };
+$('#autoAlpha').onclick=()=>{ if(!bodyCv){alert('先に本体画像を読み込んでください');return;} if(!hasUsefulAlpha(bodyCv)){ alert('この画像は背景透過がほぼありません。黒背景またはAIを使ってください。'); return; } pushHistory(); applyAlphaBody(); };
+$('#autoDark').onclick=()=>{ if(!bodyCv){alert('先に本体画像を読み込んでください');return;} pushHistory(); floodBodyMask(); $('#aiMsg').textContent='黒背景から本体を作りました。足りない所や余分な所だけ手動ブラシで直してください。'; };
+$('#runAI').onclick=runAI;
+$('#loadBody').onclick=()=>$('#fBody').click(); $('#loadFx').onclick=()=>$('#fFx').click();
+$('#fBody').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const im=new Image(); im.onload=()=>{ bodyImg=im; W=im.naturalWidth; H=im.naturalHeight; bodyCv=loadIntoCanvas(im); bodyMask=null; aiProb=null; history.length=0; $('#undo').disabled=true; if(hasUsefulAlpha(bodyCv)) applyAlphaBody(); else floodBodyMask(); fxImg=null; fxCv=null; fxMask=null; split=null; fxX=fxY=0; fxS=1; $('#fxX').value=$('#fxY').value=0; $('#fxScale').value=100; $('#fxXV').textContent=$('#fxYV').textContent='0'; $('#fxScaleV').textContent='100'; $('#empty').style.display='none'; fit(); }; im.src=URL.createObjectURL(f); e.target.value=''; };
+$('#fFx').onchange=e=>{ const f=e.target.files[0]; if(!f) return; if(!W){ alert('先に本体画像を読み込んでください'); return; } const im=new Image(); im.onload=()=>{ pushHistory(); fxImg=im; const fw=im.naturalWidth||im.width, fh=im.naturalHeight||im.height; fxBaseScale=Math.min(W/fw,H/fh); if(!isFinite(fxBaseScale)||fxBaseScale<=0) fxBaseScale=1; fxX=0; fxY=0; fxS=1; $('#fxX').value=$('#fxY').value=0; $('#fxScale').value=100; $('#fxXV').textContent=$('#fxYV').textContent='0'; $('#fxScaleV').textContent='100'; syncFxCanvas(false); $('#aiMsg').textContent='エフェクトを読み込みました。必要なら「エフェクトを編集」で前 / 後ろ / 消すを塗り分けてください。'; draw(); }; im.src=URL.createObjectURL(f); e.target.value=''; };
+function dl(c,name){ c.toBlob(b=>{ const a=document.createElement('a'),u=URL.createObjectURL(b); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),3000); },'image/png'); }
+function show(kind){ if(!W) return; $('#outPreview').src=(kind==='mask'?maskCanvas():artCanvas()).toDataURL('image/png'); $('#sheet').classList.add('on'); }
+$('#export').onclick=()=>{ if(!bodyCv){ alert('本体画像を読み込んでください'); return; } show('art'); };
+$('#showArt').onclick=()=>show('art'); $('#showMask').onclick=()=>show('mask'); $('#saveArt').onclick=()=>dl(artCanvas(),'completed_illustration.png'); $('#saveMask').onclick=()=>dl(maskCanvas(),'black_fill_image.png'); $('#close').onclick=()=>$('#sheet').classList.remove('on'); $('#sheet').onclick=e=>{ if(e.target===$('#sheet')) $('#sheet').classList.remove('on'); };
+addEventListener('resize',resize); resize();
 </script>
 </body>
 </html>
