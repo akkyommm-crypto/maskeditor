@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>レイヤー分けマスク エディタ v3</title>
+<title>レイヤー分けマスク エディタ v4</title>
 <style>
 :root{
   --ink:#14110e;--panel:#211b16;--panel2:#2c241d;--line:#42372b;
@@ -123,7 +123,7 @@ input[type=file]{display:none}
       <div class="spacer"></div>
       <span id="activeLabel" style="font-size:10px;color:var(--amber)">—</span>
     </div>
-    <div id="hint">おすすめ：AIで「主役」を作成 → エフェクトや手前パーツを別レイヤーへ移す → レイヤーごとに「黒 / 白 / なし」を設定 → 最後に最終マスクを書き出し。保護はAI・ワンドの誤爆防止に使えます。</div>
+    <div id="hint">おすすめ：原版を主役に、別画像をエフェクトに取り込む → 必要なら前後のレイヤーへ分ける → レイヤーごとに「黒 / 白 / なし」を設定 → 最後に完成イラストと黒塗り画像を書き出す。</div>
   </footer>
 </div>
 
@@ -138,7 +138,7 @@ input[type=file]{display:none}
       <button class="btn warn" id="deleteLayer">削除</button>
       <button class="btn" id="clearProtect">保護を全消去</button>
     </div>
-    <div class="note">上にあるレイヤーほど手前。各レイヤーに「黒 / 白 / 出力しない」の役割を付けられます。最終マスクは黒が優先され、黒が無い場所だけ白になります。</div>
+    <div class="note">上にあるレイヤーほど手前。各レイヤーに「黒 / 白 / 出力しない」の役割を付けられます。レイヤーごとに、原版由来か別画像由来かも保持されます。黒塗り画像では黒が優先されます。</div>
   </div>
 </div>
 
@@ -200,16 +200,14 @@ input[type=file]{display:none}
     <div class="sheetTitle"><b>書き出し</b><div class="spacer"></div><button class="btn ghost closeSheet">閉じる</button></div>
     <img id="exportPreview" alt="preview">
     <div class="sheetActions">
-      <button class="btn" id="prevLayer">選択レイヤーを表示</button>
-      <button class="btn" id="prevFinal">最終マスクを表示</button>
+      <button class="btn" id="prevComposite">完成イラストを表示</button>
+      <button class="btn" id="prevBlack">黒塗り画像を表示</button>
     </div>
     <div class="sheetActions">
-      <button class="btn" id="expLayer">選択レイヤーPNG</button>
-      <button class="btn" id="expMask">選択マスクPNG</button>
-      <button class="btn good" id="expFinalMask">最終マスクPNG</button>
-      <button class="btn good" id="expZip">全レイヤーZIP</button>
+      <button class="btn good" id="expComposite">完成イラストPNG</button>
+      <button class="btn good" id="expBlack">黒塗り画像PNG</button>
     </div>
-    <div class="note">選択レイヤーPNGは原版ピクセル＋透過。最終マスクPNGは「黒=人物など透けさせない / 白=エフェクト・背景など透ける」の完全二値です。全画像は原版と同一サイズで出力します。</div>
+    <div class="note">完成イラストPNGは、表示中の各レイヤーを前後順に合成した透過画像です。黒塗り画像PNGは「黒=人物など透けさせない / 白=エフェクト・背景など透ける」の完全二値です。</div>
   </div>
 </div>
 
@@ -225,7 +223,7 @@ let layers=[],active=0,protectCv=null,protectCtx=null;
 let tool='brush',mode='add',brush=42,tol=26,viewMode=0;
 let lasso=[],line=null,painting=false,last=null,gest=null,lastTap=0;
 const pts=new Map();
-let auxData=null,auxLoadedName='';
+let auxData=null,auxLoadedName='',auxCv=null;
 let aiLib=null,aiModel=null,aiProc=null,aiName='',aiProb=null,aiAdjusted=null,aiDirty=true;
 const AI_MODELS={rmbg:'briaai/RMBG-1.4',modnet:'Xenova/modnet'};
 const undoS=[],redoS=[];
@@ -237,11 +235,11 @@ function newLayerColor(i){const p=['#ff5f83','#ffad45','#55d98b','#49b9ff','#b77
 function layerColor(i){return layers[i]?.color||newLayerColor(i)}
 function defaultLayers(){
   layers=[
-    {name:'前エフェクト',cv:makeCanvas(),visible:true,color:'#ff5f83',role:'white'},
-    {name:'手前パーツ',cv:makeCanvas(),visible:true,color:'#ffad45',role:'black'},
-    {name:'主役',cv:makeCanvas(),visible:true,color:'#55d98b',role:'black'},
-    {name:'後ろエフェクト',cv:makeCanvas(),visible:true,color:'#49b9ff',role:'white'},
-    {name:'背景',cv:makeCanvas(),visible:true,color:'#b77cff',role:'white'}
+    {name:'前エフェクト',cv:makeCanvas(),visible:true,color:'#ff5f83',role:'white',source:'aux'},
+    {name:'手前パーツ',cv:makeCanvas(),visible:true,color:'#ffad45',role:'black',source:'src'},
+    {name:'主役',cv:makeCanvas(),visible:true,color:'#55d98b',role:'black',source:'src'},
+    {name:'後ろエフェクト',cv:makeCanvas(),visible:true,color:'#49b9ff',role:'white',source:'aux'},
+    {name:'背景',cv:makeCanvas(),visible:true,color:'#b77cff',role:'white',source:'src'}
   ];
   active=2;
 }
@@ -257,8 +255,8 @@ function activeCtx(){return activeLayer()?.cv.getContext('2d',{willReadFrequentl
 function packCanvas(c){const d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data,n=W*H,out=new Uint8Array((n+7)>>3);for(let i=0;i<n;i++)if(d[i*4+3]>127)out[i>>3]|=1<<(i&7);return out}
 function hexRgb(hex){const h=hex.replace('#','');return h.length===6?[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]:[255,255,255]}
 function unpackCanvas(c,b,color='#ffffff'){const x=c.getContext('2d'),im=x.createImageData(W,H),d=im.data,n=W*H,[r,g,bl]=hexRgb(color);for(let i=0;i<n;i++){const on=((b[i>>3]>>(i&7))&1)!==0,j=i*4;d[j]=r;d[j+1]=g;d[j+2]=bl;d[j+3]=on?255:0}x.putImageData(im,0,0)}
-function snapshot(){return{layers:layers.map(l=>({name:l.name,visible:l.visible,color:l.color,role:l.role||'skip',b:packCanvas(l.cv)})),protect:packCanvas(protectCv),active}}
-function restore(s){layers=s.layers.map(o=>{const cv=makeCanvas();unpackCanvas(cv,o.b,o.color||'#ffffff');return{name:o.name,visible:o.visible,color:o.color||'#ffffff',role:o.role||'skip',cv}});unpackCanvas(protectCv,s.protect,'#43e89b');protectCtx=protectCv.getContext('2d',{willReadFrequently:true});active=Math.min(s.active,layers.length-1);refreshLayerUI();draw()}
+function snapshot(){return{layers:layers.map(l=>({name:l.name,visible:l.visible,color:l.color,role:l.role||'skip',source:l.source||'src',b:packCanvas(l.cv)})),protect:packCanvas(protectCv),active}}
+function restore(s){layers=s.layers.map(o=>{const cv=makeCanvas();unpackCanvas(cv,o.b,o.color||'#ffffff');return{name:o.name,visible:o.visible,color:o.color||'#ffffff',role:o.role||'skip',source:o.source||'src',cv}});unpackCanvas(protectCv,s.protect,'#43e89b');protectCtx=protectCv.getContext('2d',{willReadFrequently:true});active=Math.min(s.active,layers.length-1);refreshLayerUI();draw()}
 function snap(){if(!srcCv)return;undoS.push(snapshot());if(undoS.length>18)undoS.shift();redoS.length=0;buttons()}
 function buttons(){$('#undo').disabled=!undoS.length;$('#redo').disabled=!redoS.length}
 $('#undo').onclick=()=>{if(!undoS.length)return;redoS.push(snapshot());restore(undoS.pop());buttons()};
@@ -276,7 +274,8 @@ function fillPath(points){if(points.length<3)return;const c=targetCtx();c.save()
 function snapLine(a,b){const dx=b.x-a.x,dy=b.y-a.y;if(Math.abs(dy)<Math.abs(dx)*.18)return{x:b.x,y:a.y};if(Math.abs(dx)<Math.abs(dy)*.18)return{x:a.x,y:b.y};return b}
 
 function drawMaskOverlay(cv,color,alpha=.38){vctx.globalAlpha=alpha;vctx.drawImage(cv,0,0);vctx.globalAlpha=1}
-function drawActiveExtract(){const l=activeLayer();if(!l)return;const tmp=makeCanvas(),tc=tmp.getContext('2d');tc.drawImage(srcCv,0,0);tc.globalCompositeOperation='destination-in';tc.drawImage(l.cv,0,0);vctx.drawImage(tmp,0,0)}
+function sourceCanvasForLayer(i){const l=layers[i];if(!l)return srcCv;return (l.source==='aux'&&auxCv)?auxCv:srcCv}
+function drawActiveExtract(){const l=activeLayer();if(!l)return;const tmp=makeCanvas(),tc=tmp.getContext('2d');tc.drawImage(sourceCanvasForLayer(active),0,0);tc.globalCompositeOperation='destination-in';tc.drawImage(l.cv,0,0);vctx.drawImage(tmp,0,0)}
 function buildDiagnostics(){const out=makeCanvas(),o=out.getContext('2d'),im=o.createImageData(W,H),d=im.data;const maps=layers.map(l=>l.visible?l.cv.getContext('2d').getImageData(0,0,W,H).data:null);for(let p=0;p<W*H;p++){let n=0;for(const m of maps)if(m&&m[p*4+3]>127)n++;const j=p*4;if(n>1){d[j]=255;d[j+1]=55;d[j+2]=55;d[j+3]=220}else if(n===0){d[j]=65;d[j+1]=150;d[j+2]=255;d[j+3]=120}}o.putImageData(im,0,0);return out}
 function adjustedAI(){if(!aiProb)return null;if(!aiDirty&&aiAdjusted)return aiAdjusted;const th=+$('#aiTh').value*2.55,grow=+$('#edgeGrow').value;let a=new Uint8Array(W*H);for(let i=0;i<a.length;i++)a[i]=aiProb[i]>=th?1:0;if(grow!==0){const dilate=grow>0,steps=Math.abs(grow);for(let s=0;s<steps;s++){const b=new Uint8Array(a.length);for(let y=0;y<H;y++){const row=y*W;for(let x=0;x<W;x++){const p=row+x,v=a[p];if(dilate){let q=v;if(!q&&x>0)q|=a[p-1];if(!q&&x<W-1)q|=a[p+1];if(!q&&y>0)q|=a[p-W];if(!q&&y<H-1)q|=a[p+W];b[p]=q}else{let q=v;if(q&&x>0)q&=a[p-1];else if(q&&x===0)q=0;if(q&&x<W-1)q&=a[p+1];else if(q&&x===W-1)q=0;if(q&&y>0)q&=a[p-W];else if(q&&y===0)q=0;if(q&&y<H-1)q&=a[p+W];else if(q&&y===H-1)q=0;b[p]=q}}}a=b}}
 aiAdjusted=a;aiDirty=false;return a}
@@ -311,24 +310,25 @@ $('#fit').onclick=fit;$('#zoomIn').onclick=()=>zoomAt(1.35);$('#zoomOut').onclic
 $('#viewMode').onclick=()=>{viewMode=(viewMode+1)%5;$('#viewMode').textContent=['色分け','選択だけ','選択マスク','最終マスク','重複確認'][viewMode];draw()};
 
 function roleLabel(role){return role==='black'?'黒':role==='white'?'白':'出力なし'}
-function refreshLayerUI(){const list=$('#layerList');list.innerHTML='';layers.forEach((l,i)=>{const row=document.createElement('div');row.className='layerRow'+(i===active?' active':'');row.innerHTML=`<button class="eye">${l.visible?'👁':'—'}</button><div><div class="layerName"><span class="swatch" style="background:${layerColor(i)}"></span>${escapeHtml(l.name)}</div><div class="layerMeta">${i===0?'最前面':i===layers.length-1?'最背面':'レイヤー '+(i+1)} ・ 最終出力:${roleLabel(l.role||'skip')}</div></div><select class="roleSel"><option value="black">黒</option><option value="white">白</option><option value="skip">なし</option></select><button class="mini up">↑</button><button class="mini down">↓</button><button class="mini sel">選択</button>`;row.querySelector('.roleSel').value=l.role||'skip';row.querySelector('.roleSel').onchange=e=>{l.role=e.target.value;refreshLayerUI();draw()};row.querySelector('.eye').onclick=e=>{e.stopPropagation();l.visible=!l.visible;refreshLayerUI();draw()};row.querySelector('.sel').onclick=()=>{active=i;refreshLayerUI();draw()};row.querySelector('.up').onclick=()=>{if(i===0)return;snap();[layers[i-1],layers[i]]=[layers[i],layers[i-1]];active=i-1;refreshLayerUI();draw()};row.querySelector('.down').onclick=()=>{if(i===layers.length-1)return;snap();[layers[i+1],layers[i]]=[layers[i],layers[i+1]];active=i+1;refreshLayerUI();draw()};row.onclick=()=>{active=i;refreshLayerUI();draw()};list.appendChild(row)});$('#activeLabel').textContent=`${activeLayer()?.name||'—'} / 出力:${roleLabel(activeLayer()?.role||'skip')}`;}
+function sourceLabel(src){return src==='aux'?'別画像':'原版'}
+function refreshLayerUI(){const list=$('#layerList');list.innerHTML='';layers.forEach((l,i)=>{const row=document.createElement('div');row.className='layerRow'+(i===active?' active':'');row.innerHTML=`<button class="eye">${l.visible?'👁':'—'}</button><div><div class="layerName"><span class="swatch" style="background:${layerColor(i)}"></span>${escapeHtml(l.name)}</div><div class="layerMeta">${i===0?'最前面':i===layers.length-1?'最背面':'レイヤー '+(i+1)} ・ 出力:${roleLabel(l.role||'skip')} ・ 素材:${sourceLabel(l.source||'src')}</div></div><select class="roleSel"><option value="black">黒</option><option value="white">白</option><option value="skip">なし</option></select><button class="mini up">↑</button><button class="mini down">↓</button><button class="mini sel">選択</button>`;row.querySelector('.roleSel').value=l.role||'skip';row.querySelector('.roleSel').onchange=e=>{l.role=e.target.value;refreshLayerUI();draw()};row.querySelector('.eye').onclick=e=>{e.stopPropagation();l.visible=!l.visible;refreshLayerUI();draw()};row.querySelector('.sel').onclick=()=>{active=i;refreshLayerUI();draw()};row.querySelector('.up').onclick=()=>{if(i===0)return;snap();[layers[i-1],layers[i]]=[layers[i],layers[i-1]];active=i-1;refreshLayerUI();draw()};row.querySelector('.down').onclick=()=>{if(i===layers.length-1)return;snap();[layers[i+1],layers[i]]=[layers[i],layers[i+1]];active=i+1;refreshLayerUI();draw()};row.onclick=()=>{active=i;refreshLayerUI();draw()};list.appendChild(row)});$('#activeLabel').textContent=`${activeLayer()?.name||'—'} / 出力:${roleLabel(activeLayer()?.role||'skip')} / 素材:${sourceLabel(activeLayer()?.source||'src')}`;}
 function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-$('#addLayer').onclick=()=>{if(!srcCv)return;const name=prompt('レイヤー名','新規レイヤー');if(!name)return;snap();layers.splice(active,0,{name,cv:makeCanvas(),visible:true,color:newLayerColor(layers.length+3),role:'skip'});active=Math.max(0,active);refreshLayerUI();draw()};
+$('#addLayer').onclick=()=>{if(!srcCv)return;const name=prompt('レイヤー名','新規レイヤー');if(!name)return;snap();layers.splice(active,0,{name,cv:makeCanvas(),visible:true,color:newLayerColor(layers.length+3),role:'skip',source:'src'});active=Math.max(0,active);refreshLayerUI();draw()};
 $('#renameLayer').onclick=()=>{if(!activeLayer())return;const n=prompt('新しい名前',activeLayer().name);if(!n)return;activeLayer().name=n;refreshLayerUI();draw()};
 $('#deleteLayer').onclick=()=>{if(layers.length<=1){alert('最後の1枚は削除できません');return}if(!confirm(`「${activeLayer().name}」を削除しますか？`))return;snap();layers.splice(active,1);active=Math.min(active,layers.length-1);refreshLayerUI();draw()};
 $('#clearProtect').onclick=()=>{if(!protectCv)return;snap();clearCanvas(protectCv);draw();toast('保護を消去しました')};
 
 function showSheet(id){$(id).classList.add('on')}function hideSheets(){$$('.sheet').forEach(s=>s.classList.remove('on'))}
-$('#assetBtn').onclick=()=>showSheet('#assetSheet');$('#layersBtn').onclick=()=>{refreshLayerUI();showSheet('#layersSheet')};$('#aiBtn').onclick=()=>showSheet('#aiSheet');$('#exportBtn').onclick=()=>{refreshExportPreview('final');showSheet('#exportSheet')};$$('.closeSheet').forEach(b=>b.onclick=hideSheets);$$('.sheet').forEach(s=>s.addEventListener('click',e=>{if(e.target===s)hideSheets()}));
+$('#assetBtn').onclick=()=>showSheet('#assetSheet');$('#layersBtn').onclick=()=>{refreshLayerUI();showSheet('#layersSheet')};$('#aiBtn').onclick=()=>showSheet('#aiSheet');$('#exportBtn').onclick=()=>{refreshExportPreview('composite');showSheet('#exportSheet')};$$('.closeSheet').forEach(b=>b.onclick=hideSheets);$$('.sheet').forEach(s=>s.addEventListener('click',e=>{if(e.target===s)hideSheets()}));
 
 async function aiLoad(key){if(!aiLib){$('#aiMsg').textContent='ライブラリ取得中…';aiLib=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3');aiLib.env.allowLocalModels=false}if(aiModel&&aiName===key)return;$('#aiMsg').textContent='モデル取得中…（初回のみ）';const id=AI_MODELS[key];aiModel=await aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'},device:'webgpu',dtype:'fp32'}).catch(()=>aiLib.AutoModel.from_pretrained(id,{config:{model_type:'custom'}}));aiProc=await aiLib.AutoProcessor.from_pretrained(id,{config:{do_normalize:true,do_pad:false,do_rescale:true,do_resize:true,image_mean:[.5,.5,.5],image_std:[1,1,1],feature_extractor_type:'ImageFeatureExtractor',resample:2,rescale_factor:.00392156862745098,size:{width:1024,height:1024}}});aiName=key}
 async function aiAnalyze(){if(!srcCv){alert('先に原版を読み込んでください');return}setBusy(true,'AI解析中…');try{await aiLoad($('#aiModel').value);$('#aiMsg').textContent='解析中…';const flat=makeCanvas(),fc=flat.getContext('2d');fc.fillStyle='#fff';fc.fillRect(0,0,W,H);fc.drawImage(srcCv,0,0);const raw=await aiLib.RawImage.fromURL(flat.toDataURL('image/png'));const {pixel_values}=await aiProc(raw);const out=await aiModel({input:pixel_values});const t=out.output||out.alphas||Object.values(out)[0];const m=await aiLib.RawImage.fromTensor(t[0].mul(255).to('uint8')).resize(W,H);let arr=m.data;if(arr.length!==W*H){const ch=Math.round(arr.length/(W*H));const g=new Uint8Array(W*H);for(let i=0;i<g.length;i++)g[i]=arr[i*ch];arr=g}let mn=255,mx=0;for(const v of arr){if(v<mn)mn=v;if(v>mx)mx=v}aiProb=new Uint8Array(W*H);const den=Math.max(1,mx-mn);for(let i=0;i<aiProb.length;i++)aiProb[i]=Math.max(0,Math.min(255,Math.round((arr[i]-mn)*255/den)));aiDirty=true;aiAdjusted=null;$('#aiMsg').textContent='解析完了。感度・境界を調整できます';draw()}catch(e){console.error(e);$('#aiMsg').textContent='AI解析に失敗しました';alert('AI解析に失敗しました。通信環境、WebGPU対応、モデル読み込みを確認してください。')}finally{setBusy(false)}}
 $('#runAI').onclick=aiAnalyze;$('#aiTh').oninput=e=>{$('#aiThV').textContent=e.target.value;aiDirty=true;draw()};$('#edgeGrow').oninput=e=>{$('#edgeGrowV').textContent=e.target.value;aiDirty=true;draw()};$('#aiPreview').onchange=draw;
 function applyAIMaskTo(index,invert=false){if(!aiProb){alert('先にAI解析してください');return}const a=adjustedAI(),c=ctxOf(index),im=c.createImageData(W,H),d=im.data,prot=protectCtx.getImageData(0,0,W,H).data,old=c.getImageData(0,0,W,H).data,[r,g,b]=hexRgb(layers[index].color);for(let i=0;i<W*H;i++){const j=i*4;if(prot[j+3]>127){d[j]=old[j];d[j+1]=old[j+1];d[j+2]=old[j+2];d[j+3]=old[j+3];continue}let on=!!a[i];if(invert)on=!on;d[j]=r;d[j+1]=g;d[j+2]=b;d[j+3]=on?255:0}c.putImageData(im,0,0)}
 
-$('#alphaToLayer').onclick=()=>{if(!srcCv)return;let transparent=0;for(let i=0;i<W*H;i++)if(sdata[i*4+3]<250)transparent++;if(transparent<W*H*.001){alert('この画像には有効な透明部分がほぼありません。AI解析を使ってください。');return}snap();const c=activeCtx(),im=c.createImageData(W,H),d=im.data,[r,g,b]=hexRgb(activeLayer().color),prot=protectCtx.getImageData(0,0,W,H).data,old=c.getImageData(0,0,W,H).data;for(let i=0;i<W*H;i++){const j=i*4;if(prot[j+3]>127){d[j]=old[j];d[j+1]=old[j+1];d[j+2]=old[j+2];d[j+3]=old[j+3];continue}d[j]=r;d[j+1]=g;d[j+2]=b;d[j+3]=sdata[j+3]>=128?255:0}c.putImageData(im,0,0);draw();toast('元画像の透明度を適用しました')};
-$('#applyAI').onclick=()=>{if(!aiProb){aiAnalyze();return}snap();applyAIMaskTo(active,false);if($('#exclusive').checked){const a=adjustedAI(),prot=protectCtx.getImageData(0,0,W,H).data;for(let k=0;k<layers.length;k++){if(k===active)continue;const c=ctxOf(k),im=c.getImageData(0,0,W,H),d=im.data;for(let i=0;i<W*H;i++)if(a[i]&&prot[i*4+3]<128){const j=i*4;d[j+3]=0}c.putImageData(im,0,0)}}draw();toast(`AI候補 → ${activeLayer().name}`)};
-$('#makeBg').onclick=()=>{if(!aiProb){alert('先にAI解析してください');return}let idx=layers.findIndex(l=>l.name==='背景');if(idx<0){layers.push({name:'背景',cv:makeCanvas(),visible:true,color:'#b77cff',role:'white'});idx=layers.length-1}snap();applyAIMaskTo(idx,true);refreshLayerUI();draw();toast('背景レイヤーを作成しました')};
+$('#alphaToLayer').onclick=()=>{if(!srcCv)return; activeLayer().source='src';let transparent=0;for(let i=0;i<W*H;i++)if(sdata[i*4+3]<250)transparent++;if(transparent<W*H*.001){alert('この画像には有効な透明部分がほぼありません。AI解析を使ってください。');return}snap();const c=activeCtx(),im=c.createImageData(W,H),d=im.data,[r,g,b]=hexRgb(activeLayer().color),prot=protectCtx.getImageData(0,0,W,H).data,old=c.getImageData(0,0,W,H).data;for(let i=0;i<W*H;i++){const j=i*4;if(prot[j+3]>127){d[j]=old[j];d[j+1]=old[j+1];d[j+2]=old[j+2];d[j+3]=old[j+3];continue}d[j]=r;d[j+1]=g;d[j+2]=b;d[j+3]=sdata[j+3]>=128?255:0}c.putImageData(im,0,0);draw();toast('元画像の透明度を適用しました')};
+$('#applyAI').onclick=()=>{if(!aiProb){aiAnalyze();return}snap();activeLayer().source='src';applyAIMaskTo(active,false);if($('#exclusive').checked){const a=adjustedAI(),prot=protectCtx.getImageData(0,0,W,H).data;for(let k=0;k<layers.length;k++){if(k===active)continue;const c=ctxOf(k),im=c.getImageData(0,0,W,H),d=im.data;for(let i=0;i<W*H;i++)if(a[i]&&prot[i*4+3]<128){const j=i*4;d[j+3]=0}c.putImageData(im,0,0)}}draw();toast(`AI候補 → ${activeLayer().name}`)};
+$('#makeBg').onclick=()=>{if(!aiProb){alert('先にAI解析してください');return}let idx=layers.findIndex(l=>l.name==='背景');if(idx<0){layers.push({name:'背景',cv:makeCanvas(),visible:true,color:'#b77cff',role:'white',source:'src'});idx=layers.length-1}snap();layers[idx].source='src';applyAIMaskTo(idx,true);refreshLayerUI();draw();toast('背景レイヤーを作成しました')};
 
 function buildMaskFromRGBA(data,w,h,mode='auto',thr=8){
   const n=w*h,out=new Uint8Array(n);
@@ -363,27 +363,22 @@ function applyBinaryToActive(arr,clearFirst=true,label='取り込み完了'){
   draw(); toast(label);
 }
 $('#matThr').oninput=e=>$('#matThrV').textContent=e.target.value;
-$('#srcToLayer').onclick=()=>{ if(!srcCv){alert('先に原版を読み込んでください');return} const arr=buildMaskFromRGBA(sdata,W,H,'blackbg',+$('#matThr').value); applyBinaryToActive(arr,$('#matClear').checked,'原版 → '+(activeLayer()?.name||'現在レイヤー')); };
+$('#srcToLayer').onclick=()=>{ if(!srcCv){alert('先に原版を読み込んでください');return} activeLayer().source='src'; const arr=buildMaskFromRGBA(sdata,W,H,'blackbg',+$('#matThr').value); applyBinaryToActive(arr,$('#matClear').checked,'原版 → '+(activeLayer()?.name||'現在レイヤー')); refreshLayerUI(); };
 $('#openAux').onclick=()=>$('#fAux').click();
-$('#fAux').onchange=e=>{const f=e.target.files[0]; if(!f) return; const im=new Image(); im.onload=()=>{ if(!srcCv){alert('先に原版を読み込んでください'); return } const tmp=makeCanvas(),tc=tmp.getContext('2d',{willReadFrequently:true}); tc.clearRect(0,0,W,H); tc.drawImage(im,0,0,W,H); auxData=tc.getImageData(0,0,W,H).data; auxLoadedName=f.name; $('#auxName').textContent='選択中: '+f.name+' ('+im.naturalWidth+'×'+im.naturalHeight+')'; showSheet('#assetSheet'); toast('別画像を読み込みました'); }; im.src=URL.createObjectURL(f); e.target.value='';};
-$('#auxToLayer').onclick=()=>{ if(!srcCv){alert('先に原版を読み込んでください');return} if(!auxData){alert('先に別画像を選んでください');return} const arr=buildMaskFromRGBA(auxData,W,H,$('#auxMode').value,+$('#matThr').value); applyBinaryToActive(arr,$('#matClear').checked,'別画像 → '+(activeLayer()?.name||'現在レイヤー')); };
-function transparentLayerCanvas(i){const out=makeCanvas(),c=out.getContext('2d');c.drawImage(srcCv,0,0);c.globalCompositeOperation='destination-in';c.drawImage(layers[i].cv,0,0);return out}
-function maskCanvas(i){const out=makeCanvas(),c=out.getContext('2d'),src=ctxOf(i).getImageData(0,0,W,H).data,md=c.createImageData(W,H),d=md.data;for(let p=0;p<d.length;p+=4){const v=src[p+3]>127?255:0;d[p]=d[p+1]=d[p+2]=v;d[p+3]=255}c.putImageData(md,0,0);return out}
-function finalMaskCanvas(){const out=makeCanvas(),c=out.getContext('2d'),md=c.createImageData(W,H),d=md.data;const maps=layers.map(l=>l.cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data);for(let i=0;i<W*H;i++){let isBlack=false,isWhite=false;for(let k=0;k<layers.length;k++){const l=layers[k];if(!l.visible)continue;const a=maps[k][i*4+3]>127;if(!a)continue;const role=l.role||'skip';if(role==='black'){isBlack=true;break}else if(role==='white'){isWhite=true}}const j=i*4;const v=isBlack?0:255;d[j]=d[j+1]=d[j+2]=v;d[j+3]=255;}c.putImageData(md,0,0);return out}
-function refreshExportPreview(kind='layer'){$('#exportPreview').src=(kind==='final'?finalMaskCanvas():(activeLayer()?transparentLayerCanvas(active):makeCanvas())).toDataURL('image/png');}
-function safeName(s){return s.replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_').slice(0,60)||'layer'}
+$('#fAux').onchange=e=>{const f=e.target.files[0]; if(!f) return; const im=new Image(); im.onload=()=>{ if(!srcCv){alert('先に原版を読み込んでください'); return } auxCv=makeCanvas(); const tmp=makeCanvas(),tc=tmp.getContext('2d',{willReadFrequently:true}),ac=auxCv.getContext('2d',{willReadFrequently:true}); tc.clearRect(0,0,W,H); ac.clearRect(0,0,W,H); tc.drawImage(im,0,0,W,H); ac.drawImage(im,0,0,W,H); auxData=tc.getImageData(0,0,W,H).data; auxLoadedName=f.name; $('#auxName').textContent='選択中: '+f.name+' ('+im.naturalWidth+'×'+im.naturalHeight+')'; showSheet('#assetSheet'); toast('別画像を読み込みました'); }; im.src=URL.createObjectURL(f); e.target.value='';};
+$('#auxToLayer').onclick=()=>{ if(!srcCv){alert('先に原版を読み込んでください');return} if(!auxData){alert('先に別画像を選んでください');return} activeLayer().source='aux'; const arr=buildMaskFromRGBA(auxData,W,H,$('#auxMode').value,+$('#matThr').value); applyBinaryToActive(arr,$('#matClear').checked,'別画像 → '+(activeLayer()?.name||'現在レイヤー')); refreshLayerUI(); };
+function transparentLayerCanvas(i){const out=makeCanvas(),c=out.getContext('2d');c.drawImage(sourceCanvasForLayer(i),0,0);c.globalCompositeOperation='destination-in';c.drawImage(layers[i].cv,0,0);return out}
+function compositeIllustrationCanvas(){const out=makeCanvas(),c=out.getContext('2d');for(let i=layers.length-1;i>=0;i--){if(!layers[i].visible)continue;const part=transparentLayerCanvas(i);c.drawImage(part,0,0)}return out}
+function finalMaskCanvas(){const out=makeCanvas(),c=out.getContext('2d'),md=c.createImageData(W,H),d=md.data;const maps=layers.map(l=>l.cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data);for(let i=0;i<W*H;i++){let isBlack=false;for(let k=0;k<layers.length;k++){const l=layers[k];if(!l.visible)continue;const a=maps[k][i*4+3]>127;if(!a)continue;const role=l.role||'skip';if(role==='black'){isBlack=true;break}}const j=i*4;const v=isBlack?0:255;d[j]=d[j+1]=d[j+2]=v;d[j+3]=255;}c.putImageData(md,0,0);return out}
+function refreshExportPreview(kind='composite'){$('#exportPreview').src=(kind==='black'?finalMaskCanvas():compositeIllustrationCanvas()).toDataURL('image/png');}
 function downloadCanvas(c,name){c.toBlob(b=>{const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000)},'image/png')}
-$('#prevLayer').onclick=()=>{if(!srcCv)return;refreshExportPreview('layer')};
-$('#prevFinal').onclick=()=>{if(!srcCv)return;refreshExportPreview('final')};
-$('#expLayer').onclick=()=>{if(!srcCv)return;downloadCanvas(transparentLayerCanvas(active),`${String(active+1).padStart(2,'0')}_${safeName(activeLayer().name)}.png`)};
-$('#expMask').onclick=()=>{if(!srcCv)return;downloadCanvas(maskCanvas(active),`${String(active+1).padStart(2,'0')}_${safeName(activeLayer().name)}_mask.png`)};
-$('#expFinalMask').onclick=()=>{if(!srcCv)return;downloadCanvas(finalMaskCanvas(),'final_black_character_white_effect_mask.png')};
-function ensureJSZip(){return new Promise((resolve,reject)=>{if(window.JSZip)return resolve(window.JSZip);const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';s.onload=()=>resolve(window.JSZip);s.onerror=reject;document.head.appendChild(s)})}
-function canvasBlob(c){return new Promise(r=>c.toBlob(r,'image/png'))}
-$('#expZip').onclick=async()=>{if(!srcCv)return;setBusy(true,'ZIP作成中…');try{const JSZip=await ensureJSZip(),z=new JSZip();z.file('original.png',await canvasBlob(srcCv));for(let i=0;i<layers.length;i++){const base=`${String(i+1).padStart(2,'0')}_${safeName(layers[i].name)}`;z.file(base+'.png',await canvasBlob(transparentLayerCanvas(i)));z.file(base+'_mask.png',await canvasBlob(maskCanvas(i)))}z.file('protect_mask.png',await canvasBlob(maskCanvasFromCanvas(protectCv)));z.file('final_black_character_white_effect_mask.png',await canvasBlob(finalMaskCanvas()));z.file('layers.json',JSON.stringify({width:W,height:H,layers:layers.map((l,i)=>({order:i,name:l.name,visible:l.visible,role:l.role||'skip'}))},null,2));const blob=await z.generateAsync({type:'blob'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='layered_card_assets.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}catch(e){console.error(e);alert('ZIP作成に失敗しました。通信できない場合は個別PNG書き出しを使ってください。')}finally{setBusy(false)}};
+$('#prevComposite').onclick=()=>{if(!srcCv)return;refreshExportPreview('composite')};
+$('#prevBlack').onclick=()=>{if(!srcCv)return;refreshExportPreview('black')};
+$('#expComposite').onclick=()=>{if(!srcCv)return;downloadCanvas(compositeIllustrationCanvas(),'completed_illustration.png')};
+$('#expBlack').onclick=()=>{if(!srcCv)return;downloadCanvas(finalMaskCanvas(),'black_fill_mask.png')};
 function maskCanvasFromCanvas(cv){const out=makeCanvas(),c=out.getContext('2d'),src=cv.getContext('2d').getImageData(0,0,W,H).data,md=c.createImageData(W,H),d=md.data;for(let p=0;p<d.length;p+=4){const v=src[p+3]>127?255:0;d[p]=d[p+1]=d[p+2]=v;d[p+3]=255}c.putImageData(md,0,0);return out}
 
-$('#openSrc').onclick=()=>$('#fSrc').click();$('#fSrc').onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{W=im.naturalWidth;H=im.naturalHeight;srcCv=makeCanvas();srcCv.getContext('2d',{willReadFrequently:true}).drawImage(im,0,0);sdata=srcCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;protectCv=makeCanvas();protectCtx=protectCv.getContext('2d',{willReadFrequently:true});clearCanvas(protectCv);defaultLayers();layers.forEach(l=>clearCanvas(l.cv));aiProb=null;aiAdjusted=null;aiDirty=true;undoS.length=0;redoS.length=0;buttons();$('#empty').style.display='none';refreshLayerUI();fit();toast(`${W}×${H} 読み込み完了`)};im.src=URL.createObjectURL(f);e.target.value=''};
+$('#openSrc').onclick=()=>$('#fSrc').click();$('#fSrc').onchange=e=>{const f=e.target.files[0];if(!f)return;const im=new Image();im.onload=()=>{W=im.naturalWidth;H=im.naturalHeight;srcCv=makeCanvas();srcCv.getContext('2d',{willReadFrequently:true}).drawImage(im,0,0);sdata=srcCv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;protectCv=makeCanvas();protectCtx=protectCv.getContext('2d',{willReadFrequently:true});clearCanvas(protectCv);auxData=null;auxLoadedName='';auxCv=null;$('#auxName').textContent='別画像が未選択です';defaultLayers();layers.forEach(l=>clearCanvas(l.cv));aiProb=null;aiAdjusted=null;aiDirty=true;undoS.length=0;redoS.length=0;buttons();$('#empty').style.display='none';refreshLayerUI();fit();toast(`${W}×${H} 読み込み完了`)};im.src=URL.createObjectURL(f);e.target.value=''};
 
 addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(()=>{resize();if(srcCv)fit()},120));if(window.ResizeObserver){let rt=null,lastW=0,lastH=0;new ResizeObserver(()=>{clearTimeout(rt);rt=setTimeout(()=>{const r=stage.getBoundingClientRect();if(Math.abs(r.width-lastW)<1&&Math.abs(r.height-lastH)<1)return;const first=lastW===0;lastW=r.width;lastH=r.height;resize();if(first&&srcCv)fit()},60)}).observe(stage)}
 resize();refreshLayerUI();
